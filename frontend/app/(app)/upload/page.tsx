@@ -67,13 +67,13 @@ export default function UploadPage() {
   }
 
   const fld = (it: Item, k: keyof Meta, label: string, req?: boolean) => (
-    <Field label={label} req={req} error={it.errors[k]}>
+    <Field label={label} req={req} error={it.errors[k]} htmlFor={`u-${k}`}>
       {k === "type" || k === "authority" || k === "dept" || k === "visibility" || k === "institution" ? (
-        <select className={`inp ${it.errors[k] ? "err" : ""}`} value={(it.meta[k] as string) || ""} onChange={(e) => setMeta(it.id, { [k]: e.target.value } as Meta)}>
+        <select id={`u-${k}`} className={`inp ${it.errors[k] ? "err" : ""}`} value={(it.meta[k] as string) || ""} onChange={(e) => setMeta(it.id, { [k]: e.target.value } as Meta)}>
           <option value="">Select…</option>{(k === "type" ? L.TYPES : k === "authority" ? L.AUTHS : k === "dept" ? L.DEPTS : k === "visibility" ? L.VIS : L.INSTS).map((x) => <option key={x}>{x}</option>)}
         </select>
       ) : (
-        <input className={`inp ${it.errors[k] ? "err" : ""}`} type={k.includes("date") || k === "effective" || k === "expiry" ? "date" : "text"}
+        <input id={`u-${k}`} className={`inp ${it.errors[k] ? "err" : ""}`} type={k.includes("date") || k === "effective" || k === "expiry" ? "date" : "text"}
           value={(it.meta[k] as string) || ""} onChange={(e) => setMeta(it.id, { [k]: e.target.value } as Meta)} />
       )}
     </Field>

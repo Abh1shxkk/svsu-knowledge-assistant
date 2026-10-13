@@ -43,23 +43,28 @@ def verify(login_id: str, password: str) -> dict | None:
     hashed = store.get_credential(login_id)
     if not hashed or not _check(password, hashed):
         return None
-    rec = next((u for u in store.all_records()["users"] if str(u.get("login_id", "")) == login_id), None)
-    if rec and rec.get("active") is False:  # deactivated in Administration
+    rec = user_record(login_id)
+    if not rec or rec.get("active") is False:  # no account, or deactivated in Administration
         return None
-    return {"login_id": login_id, "employee_id": 0,
-            "name": rec["name"] if rec else login_id, "email": rec.get("email", "") if rec else "",
-            "dept": rec.get("dept", "") if rec else ""}
+    return _profile(login_id, rec)
+
+
+def user_record(login_id: str) -> dict | None:
+    return store.get("users", "us-" + str(login_id).strip())
+
+
+def _profile(login_id: str, rec: dict) -> dict:
+    return {"login_id": login_id, "employee_id": 0, "name": rec.get("name") or login_id,
+            "email": rec.get("email", ""), "dept": rec.get("dept", ""),
+            "role": rec["role"] if rec.get("role") in ROLES else "Viewer"}
 
 
 def app_role(login_id: str) -> str:
-    """Role this app grants the user: a bootstrap admin, their saved role, or Viewer by default."""
-    login_id = str(login_id).strip()
-    if settings.dev_admin_user and login_id == settings.dev_admin_user:
+    """Role this app grants the user: the test admin, their saved role, or Viewer by default."""
+    if settings.dev_admin_user and str(login_id).strip() == settings.dev_admin_user:
         return "Administrator"
-    for u in store.all_records()["users"]:
-        if str(u.get("login_id", "")) == login_id:
-            return u["role"] if u["role"] in ROLES else "Viewer"
-    return "Viewer"
+    rec = user_record(login_id)
+    return rec["role"] if rec and rec.get("role") in ROLES else "Viewer"
 
 
 def make_token(user: dict, role: str) -> str:
@@ -69,11 +74,21 @@ def make_token(user: dict, role: str) -> str:
 
 
 def current_user(authorization: str = Header(default="")) -> dict:
+    """The signed-in person, read fresh on every request: a role change, deactivation or deleted
+    account takes effect immediately, not when their sign-in expires."""
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(401, "Please sign in again.")
+    if payload.get("dev"):
+        if payload.get("login_id") != settings.dev_admin_user:  # test admin was removed from .env
+            raise HTTPException(401, "Please sign in again.")
+        return payload
+    rec = user_record(payload.get("login_id", ""))
+    if not rec or rec.get("active") is False:
+        raise HTTPException(401, "Your account is no longer active.")
+    return {**_profile(payload["login_id"], rec), "dev": False}
 
 
 def require_role(*allowed: str):

@@ -1,5 +1,6 @@
 """SVSU Knowledge Assistant API."""
 import json
+import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -46,6 +47,8 @@ def login(body: Login):
     if not user:
         raise HTTPException(401, "Wrong Login ID or password.")
     user["role"] = auth.app_role(user["login_id"])
+    if rec := auth.user_record(user["login_id"]):  # shown as "Last active" in Administration
+        store.put("users", rec["id"], {**rec, "last": datetime.now().strftime("%d %b %Y, %I:%M %p").lstrip("0")})
     return {"token": auth.make_token(user, user["role"]), "user": user}
 
 
@@ -84,6 +87,28 @@ def create_account(body: Account, admin: dict = Depends(auth.require_role("Admin
     store.set_credential(login_id, auth.hash_password(body.password))
     _audit(admin, "Added user", f"{body.name} ({login_id}) as {role}")
     return {"ok": True}
+
+
+class Profile(BaseModel):
+    name: str
+    email: str = ""
+
+
+@app.put("/me/profile")
+def update_profile(body: Profile, user: dict = Depends(auth.current_user)):
+    """People edit their own name and email. Role and department are set by an administrator,
+    because they decide what the person may see."""
+    if user.get("dev"):
+        raise HTTPException(400, "The local test admin has no profile. Create a real account to use this.")
+    name, email = body.name.strip(), body.email.strip()
+    if not name:
+        raise HTTPException(400, "Enter your name.")
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(400, "That email address doesn't look right.")
+    rec = auth.user_record(user["login_id"])
+    store.put("users", rec["id"], {**rec, "name": name, "email": email})
+    _audit({**user, "name": name}, "Updated profile", f"{name} ({user['login_id']})")
+    return {**user, "name": name, "email": email}
 
 
 class PasswordChange(BaseModel):

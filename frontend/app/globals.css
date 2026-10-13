@@ -537,7 +537,7 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .me .iconbtn:hover{background:var(--side-hover);border-color:transparent;color:var(--fg)}
 
 /* Collapsed rail: icons only, labels fade, badges become dots */
-.app.collapsed .lbl,.app.collapsed .brand div,.app.collapsed .me>div,.app.collapsed .me .iconbtn{opacity:0;pointer-events:none;width:0;overflow:hidden}
+.app.collapsed .lbl,.app.collapsed .brand div,.app.collapsed .me-link div,.app.collapsed .me .iconbtn{opacity:0;pointer-events:none;width:0;overflow:hidden}
 .app.collapsed .nav a{justify-content:center;padding:0;gap:0}
 .app.collapsed .nav a .badge{position:absolute;top:8px;right:14px;width:7px;height:7px;padding:0;font-size:0;background:var(--accent)}
 .app{padding-left:10px}
@@ -692,7 +692,7 @@ h1,h2,h3,h4{letter-spacing:-.02em}
   .side{position:fixed;inset:8px auto 8px 8px;width:260px;transform:translateX(-110%);transition:transform .28s var(--ease);
     background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg)}
   .app.sideopen .side{transform:none}
-  .app.collapsed .lbl,.app.collapsed .brand div,.app.collapsed .me>div{opacity:1;width:auto}
+  .app.collapsed .lbl,.app.collapsed .brand div,.app.collapsed .me-link div{opacity:1;width:auto}
   .tiles,.lists2,.statrow{grid-template-columns:1fr 1fr}
   .gsearch{display:none}
 }
@@ -701,3 +701,8 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .searched{display:flex;gap:7px;align-items:flex-start;padding:8px 16px 0;font-size:11.5px;color:var(--fg-3)}
 .searched svg{flex:none;margin-top:1px}
 .me .iconbtn + .iconbtn{margin-left:0}
+.me-link{display:flex;align-items:center;gap:10px;min-width:0;flex:1;border-radius:12px;padding:4px;margin:-4px;transition:background .18s var(--ease)}
+.me-link:hover{background:var(--side-hover)}
+.app.collapsed .me-link{flex:none;justify-content:center}
+.top a.uav{text-decoration:none}
+.noaccess{max-width:520px;margin:60px auto;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}

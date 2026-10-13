@@ -22,3 +22,7 @@ dist/
 # os
 .DS_Store
 Thumbs.db
+
+# browser tests
+test-results/
+playwright-report/

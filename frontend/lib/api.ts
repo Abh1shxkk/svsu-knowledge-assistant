@@ -31,7 +31,7 @@ const jsonBody = (method: string, body: unknown): RequestInit => ({
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
 
-export type SessionUser = { login_id: string; name: string; email: string; role: string; employee_id?: number };
+export type SessionUser = { login_id: string; name: string; email: string; role: string; dept?: string; dev?: boolean; employee_id?: number };
 
 export const api = {
   login: (login_id: string, password: string) =>
@@ -50,6 +50,7 @@ export const api = {
   deadlines: (docId: string) => call<Omit<Deadline, "id" | "dept">[]>(`/documents/${docId}/deadlines`, { method: "POST" }),
   createAccount: (a: { login_id: string; name: string; email: string; dept: string; role: string; password: string }) =>
     call<{ ok: boolean }>("/accounts", jsonBody("POST", a)),
+  updateProfile: (p: { name: string; email: string }) => call<SessionUser>("/me/profile", jsonBody("PUT", p)),
   changePassword: (current: string, next: string) =>
     call<{ ok: boolean }>("/me/password", jsonBody("PUT", { current, new: next })),
   resetPassword: (login_id: string, password: string) =>
