@@ -1,0 +1,41 @@
+# Test deployment on a shared server: three containers, each with a memory limit so the other
+# apps on the machine keep running. Only localhost ports are opened; Caddy serves them over HTTPS.
+name: svsu
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: svsu
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: svsu_assistant
+    volumes: [db:/var/lib/postgresql/data]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U svsu -d svsu_assistant"]
+      interval: 10s
+      retries: 10
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://svsu:${DB_PASSWORD}@db:5432/svsu_assistant
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["127.0.0.1:8097:8000"]
+    mem_limit: 640m
+
+  web:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.js"]
+    environment: { PORT: "3000", HOSTNAME: "0.0.0.0", NODE_ENV: production }
+    volumes: ["./web:/app:ro"]   # the standalone build, made on a developer machine (see README)
+    ports: ["127.0.0.1:3097:3000"]
+    mem_limit: 256m
+
+volumes:
+  db:

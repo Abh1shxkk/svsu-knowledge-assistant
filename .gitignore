@@ -30,3 +30,8 @@ playwright-report/
 # keys and certificates — never commit
 *.pem
 *.key
+
+# deployment secrets and build output
+deploy/.env
+deploy/web/
+frontend/.next-prod/
