@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     aws_region: str = "ap-south-1"
 
+    # Load the prototype's sample documents into an empty database (development only).
+    demo_data: bool = False
+
     jwt_secret: str = "change-me-in-production"
     token_hours: int = 12
     # Local test admin (dev only). Leave blank in production.

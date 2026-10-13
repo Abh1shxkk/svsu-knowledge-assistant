@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import auth, extract, policy, rag, store
+from .config import settings
 
 
 @asynccontextmanager
@@ -69,8 +70,10 @@ class PasswordReset(BaseModel):
 @app.post("/accounts")
 def create_account(body: Account, admin: dict = Depends(auth.require_role("Administrator"))):
     login_id = body.login_id.strip()
-    if not login_id or not body.password:
-        raise HTTPException(400, "Login ID and password are required.")
+    if not login_id:
+        raise HTTPException(400, "Login ID is required.")
+    if err := auth.password_problem(body.password):
+        raise HTTPException(400, err)
     if store.get_credential(login_id) or any(str(u.get("login_id", "")) == login_id for u in store.all_records()["users"]):
         raise HTTPException(409, "An account with that Login ID already exists.")
     role = body.role if body.role in auth.ROLES else "Viewer"
@@ -79,14 +82,33 @@ def create_account(body: Account, admin: dict = Depends(auth.require_role("Admin
         "dept": body.dept, "role": role, "active": True, "last": "Never",
     })
     store.set_credential(login_id, auth.hash_password(body.password))
+    _audit(admin, "Added user", f"{body.name} ({login_id}) as {role}")
+    return {"ok": True}
+
+
+class PasswordChange(BaseModel):
+    current: str
+    new: str
+
+
+@app.put("/me/password")
+def change_own_password(body: PasswordChange, user: dict = Depends(auth.current_user)):
+    if user.get("dev"):
+        raise HTTPException(400, "The local test admin's password is set in backend/.env.")
+    if not auth.verify(user["login_id"], body.current):
+        raise HTTPException(400, "Your current password is wrong.")
+    if err := auth.password_problem(body.new):
+        raise HTTPException(400, err)
+    store.set_credential(user["login_id"], auth.hash_password(body.new))
     return {"ok": True}
 
 
 @app.put("/accounts/{login_id}/password")
 def reset_password(login_id: str, body: PasswordReset, admin: dict = Depends(auth.require_role("Administrator"))):
-    if not body.password:
-        raise HTTPException(400, "Password is required.")
+    if err := auth.password_problem(body.password):
+        raise HTTPException(400, err)
     store.set_credential(login_id, auth.hash_password(body.password))
+    _audit(admin, "Reset password", login_id)
     return {"ok": True}
 
 
@@ -126,6 +148,7 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
         raise HTTPException(403, err)
     if kind == "users" and old.get("login_id"):
         store.delete_credential(str(old["login_id"]))
+        _audit(user, "Deleted user", f"{old.get('name', '')} ({old['login_id']})")
     store.delete(kind, id)
     if kind == "documents":
         rag.remove_document(id)
@@ -186,9 +209,9 @@ def _audit_action(kind: str, new: dict, old: dict | None) -> tuple[str, str] | N
 
 
 def _audit(user: dict, act: str, what: str) -> None:
-    now = datetime.now()
-    store.put("audit", uuid.uuid4().hex, {
-        "id": uuid.uuid4().hex, "t": now.strftime("%d %b %Y, %I:%M %p").lstrip("0"),
+    now, entry_id = datetime.now(), uuid.uuid4().hex
+    store.put("audit", entry_id, {
+        "id": entry_id, "t": now.strftime("%d %b %Y, %I:%M %p").lstrip("0"),
         "at": now.isoformat(timespec="seconds"), "who": user.get("name") or user.get("login_id"),
         "act": act, "what": what,
     })
@@ -200,20 +223,21 @@ def _check_kind(kind: str) -> None:
 
 
 def _seed() -> None:
-    """First run only: load the prototype's sample data so every screen has content."""
+    """First run only: the reference lists, AI settings and access matrix. The prototype's sample
+    documents, people and activity are added only when DEMO_DATA is on (development)."""
     s = json.loads((Path(__file__).parent.parent / "seed.json").read_text(encoding="utf-8"))
-    for d in s["docs"]:
-        d["sample"] = True
-        rag.index_document(d)
     lists = {k: s[k] for k in ("TAGS", "AUDS", "DEPTS", "TYPES", "AUTHS", "INSTS", "VIS", "VIS_DESC")}
-    kinds = {
-        "documents": s["docs"], "collections": s["collections"], "deadlines": s["deadlines"],
-        "unanswered": s["unanswered"], "users": s["users"], "audit": s["audit"],
-        "bm_passages": s["bmPassages"],
-        "feedback": s["feedback"], "conflicts": s["conflicts"],
-        "settings": [{"id": "lists", **lists}, {"id": "ai", **s["aiSettings"]},
-                     {"id": "roles", "matrix": s["roleMatrix"]}],
-    }
+    kinds: dict[str, list] = {"settings": [{"id": "lists", **lists}, {"id": "ai", **s["aiSettings"]},
+                                           {"id": "roles", "matrix": s["roleMatrix"]}]}
+    if settings.demo_data:
+        for d in s["docs"]:
+            d["sample"] = True
+            rag.index_document(d)
+        kinds |= {
+            "documents": s["docs"], "collections": s["collections"], "deadlines": s["deadlines"],
+            "unanswered": s["unanswered"], "users": s["users"], "audit": s["audit"],
+            "bm_passages": s["bmPassages"], "feedback": s["feedback"], "conflicts": s["conflicts"],
+        }
     for kind, items in kinds.items():
         for i, item in reversed(list(enumerate(items))):  # oldest first, so lists read newest first
             item.setdefault("id", f"{kind}-{i + 1}")

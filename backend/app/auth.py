@@ -14,6 +14,15 @@ from .config import settings
 ROLES = ["Administrator", "Approver", "Uploader", "Viewer"]
 
 
+def password_problem(password: str) -> str | None:
+    """None if the password is acceptable, else what's wrong with it."""
+    if len(password) < 10:
+        return "Use at least 10 characters."
+    if password.isdigit() or password.isalpha():
+        return "Mix letters with numbers or symbols."
+    return None
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode()
 

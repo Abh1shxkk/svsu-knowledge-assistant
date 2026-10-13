@@ -3,12 +3,12 @@ import {
   ChevronRight, Clock, Copy, ExternalLink, Eye, FileText, Filter, Globe, History, LayoutDashboard, LayoutGrid,
   Layers, Link2, List, LogOut, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw,
   Save, Search, Send, Share2, ShieldCheck, SlidersHorizontal, Sparkles, Sun, Tag, ThumbsDown, ThumbsUp, Trash2,
-  Upload, User, X, ZoomIn, ZoomOut, type LucideIcon,
+  Upload, User, X, ZoomIn, ZoomOut, KeyRound, type LucideIcon,
 } from "lucide-react";
 
 /** Icon names mirror the prototype so screens read the same. */
 const ICONS: Record<string, LucideIcon> = {
-  panelClose: PanelLeftClose, panelOpen: PanelLeftOpen, sun: Sun, moon: Moon, logout: LogOut, arrow: ArrowUpRight,
+  panelClose: PanelLeftClose, panelOpen: PanelLeftOpen, sun: Sun, moon: Moon, logout: LogOut, arrow: ArrowUpRight, key: KeyRound,
   home: LayoutDashboard, chat: MessageCircle, file: FileText, upload: Upload, check: Check,
   shield: ShieldCheck, layers: Layers, cal: Calendar, bm: Bookmark, chart: BarChart3,
   sliders: SlidersHorizontal, search: Search, bell: Bell, x: X, cl: ChevronLeft, cr: ChevronRight,

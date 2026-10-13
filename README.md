@@ -45,3 +45,16 @@ npm run dev                     # http://localhost:3000
 ```
 
 Needs Tesseract installed, with `eng`, `hin` and `osd` language files in `TESSDATA_DIR`.
+
+## First administrator
+
+A new database starts empty (only the reference lists and settings). Create the first administrator
+from the `backend` folder — the password is typed at a hidden prompt:
+
+```bash
+python -m app.cli create-admin --login-id <login id> --name "<full name>" --dept "<department>"
+```
+
+Everyone else is added by an administrator in **Administration → Users & roles**, and can change their
+own password with the key button in the sidebar. For development, `DEMO_DATA=true` loads the
+prototype's 16 sample documents into an empty database.

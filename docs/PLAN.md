@@ -124,7 +124,8 @@ Inputs: the person's role, the role → visibility matrix from settings, their d
 
 **Progress:** 0.2 done (`app/policy.py`, `tests/test_policy.py`); 0.5 done; 0.4 partly (the server
 rejects status changes by non-approvers and writes the audit log, but dedicated transition endpoints
-are still to come); 0.6 partly (chats and bookmarks are private; collections record their owner).
+are still to come); 0.6 partly (chats and bookmarks are private; collections record their owner); 0.9 done except
+running `create-admin` for the real administrator and removing the test admin.
 
 | Step | Work | Done when |
 |---|---|---|

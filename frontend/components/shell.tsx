@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 import { canApprove, canUpload, isAdmin, me, useStore } from "@/lib/store";
 import { daysTo } from "@/lib/util";
 import { Icon } from "./icon";
@@ -53,9 +54,43 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="me">
         <span className="av">{u.initials}</span>
         <div style={{ minWidth: 0 }}><b>{u.name}</b><span>{u.title}</span></div>
+        <button className="iconbtn" title="Change password" aria-label="Change password" type="button"
+          onClick={() => useStore.getState().openModal({ title: "Change password", body: <ChangePassword /> })}><Icon n="key" s /></button>
         <button className="iconbtn" title="Sign out" aria-label="Sign out" onClick={() => useStore.getState().logout()} type="button"><Icon n="logout" s /></button>
       </div>
     </aside>
+  );
+}
+
+function ChangePassword() {
+  const { closeModal, toast } = useStore.getState();
+  const [f, setF] = useState({ current: "", next: "", again: "" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (f.next !== f.again) { setError("The new passwords don't match."); return; }
+    setBusy(true); setError("");
+    try { await api.changePassword(f.current, f.next); closeModal(); toast("Password changed"); }
+    catch (err) { setError((err as Error).message); setBusy(false); }
+  };
+  const field = (k: keyof typeof f, label: string, auto: string) => (
+    <div className="fld"><label htmlFor={`pw-${k}`}>{label}</label>
+      <input className="inp" id={`pw-${k}`} type="password" autoComplete={auto} required value={f[k]}
+        onChange={(e) => setF({ ...f, [k]: e.target.value })} /></div>
+  );
+  return (
+    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {field("current", "Current password", "current-password")}
+      {field("next", "New password", "new-password")}
+      {field("again", "Repeat new password", "new-password")}
+      <span className="xs muted">At least 10 characters, mixing letters with numbers or symbols.</span>
+      {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <button className="btn" type="button" onClick={closeModal}>Cancel</button>
+        <button className="btn pri" type="submit" disabled={busy}>{busy ? "Saving…" : "Change password"}</button>
+      </div>
+    </form>
   );
 }
 
