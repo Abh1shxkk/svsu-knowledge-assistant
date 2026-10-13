@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { canApprove, canUpload, isAdmin, me, useStore } from "@/lib/store";
 import { daysTo } from "@/lib/util";
+import { api } from "@/lib/api";
+import type { Notice } from "@/lib/types";
 import { Icon } from "./icon";
 
 /** [route, label, icon, visible?] — order and names match the prototype. */
@@ -96,9 +98,47 @@ export function Topbar({ collapsed, onToggle }: { collapsed: boolean; onToggle: 
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search documents, reference numbers…" aria-label="Search documents" />
       </form>
       {path !== "/ask" && <Link className="btn pri" href="/ask"><Icon n="spark" s /><span>Ask AI</span></Link>}
+      <Bell />
       <ThemeToggle />
       <Link href="/profile" className="uav" title="My profile" aria-label="My profile">{me(s).initials}</Link>
     </header>
+  );
+}
+
+/** Notifications, worked out by the server; refreshed on every page change and each minute. */
+function Bell() {
+  const path = usePathname();
+  const router = useRouter();
+  const s = useStore();
+  const [items, setItems] = useState<Notice[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const get = () => api.notifications().then(setItems).catch(() => {});
+    get();
+    const t = setInterval(get, 60_000);
+    return () => clearInterval(t);
+  }, [path, s.documents, s.deadlines]);
+  const prefsId = "pf-" + (s.session?.login_id ?? "");
+  const seen = new Set(s.prefs.find((p) => p.id === prefsId)?.seen ?? []);
+  const fresh = items.filter((n) => !seen.has(n.key));
+  const markRead = () => { void s.save("prefs", { id: prefsId, seen: items.map((n) => n.key) }); setOpen(false); };
+  return (
+    <>
+      <button className="iconbtn" style={{ position: "relative" }} aria-label={`Notifications${fresh.length ? ` (${fresh.length} new)` : ""}`} title="Notifications" onClick={() => setOpen((o) => !o)} type="button">
+        <Icon n="bell" />{fresh.length > 0 && <span className="dot" />}
+      </button>
+      {open && (
+        <div className="dropdown" role="dialog" aria-label="Notifications">
+          <div className="card-h"><h3>Notifications</h3>{items.length > 0 && <button className="btn ghost sm" onClick={markRead} type="button">Mark all read</button>}</div>
+          {items.length ? items.map((n) => (
+            <button key={n.key} className="li" type="button" onClick={() => { setOpen(false); router.push(n.href); }}>
+              <span className="av" style={{ width: 28, height: 28 }}><Icon n="bell" s /></span>
+              <div className="main"><b style={{ whiteSpace: "normal", fontWeight: seen.has(n.key) ? 400 : 600 }}>{n.text}</b></div>
+            </button>
+          )) : <div className="empty sm">You&apos;re all caught up.</div>}
+        </div>
+      )}
+    </>
   );
 }
 

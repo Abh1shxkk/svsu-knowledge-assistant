@@ -22,6 +22,10 @@ def chat(system: str, user: str, as_json: bool = False, model: str | None = None
     return json.loads(text) if as_json else text
 
 
-def embed(texts: list[str]) -> list[list[float]]:
-    res = client().embeddings.create(model=settings.embed_model, input=texts)
-    return [d.embedding for d in res.data]
+def embed(texts: list[str], batch: int = 256) -> list[list[float]]:
+    """Sent in batches, so a long document stays under the API's per-request limits."""
+    out: list[list[float]] = []
+    for i in range(0, len(texts), batch):
+        res = client().embeddings.create(model=settings.embed_model, input=texts[i:i + batch])
+        out += [d.embedding for d in res.data]
+    return out

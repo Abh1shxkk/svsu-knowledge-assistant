@@ -1,6 +1,7 @@
 """Upload processing: read any supported file into pages of paragraphs, suggest its details,
 and find the deadlines it sets."""
 import csv
+import hashlib
 import io
 import json
 import re
@@ -51,6 +52,12 @@ def extract(filename: str, raw: bytes) -> dict:
         "ocr": round(sum(c for _, c, _ in scans) / len(scans)) if scans else None,
         "ocr_engine": "+".join(sorted({e for _, _, e in scans})) or None,
     }
+
+
+def text_hash(pages: list[list[dict]]) -> str:
+    """Fingerprint of a document's text (case and spacing ignored), to spot the same file uploaded twice."""
+    text = " ".join(block_text(b) for page in pages for b in page)
+    return hashlib.sha256(" ".join(text.lower().split()).encode()).hexdigest() if text.strip() else ""
 
 
 def _paras(text: str) -> list[str]:

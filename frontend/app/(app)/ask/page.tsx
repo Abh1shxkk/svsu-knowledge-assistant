@@ -3,12 +3,13 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { filterCount, scopeDocs, scopeLabel, useStore } from "@/lib/store";
+import { aiSettings, chatGroup, clearScope, filterCount, scopeDocs, scopeLabel, useStore } from "@/lib/store";
 import type { Answer, Chat, Msg } from "@/lib/types";
-import { isHindi, nid } from "@/lib/util";
+import { isHindi, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { AnswerView, KIND_INFO, answerText } from "@/components/answer";
 import { ScopeModal, FiltersModal } from "./modals";
+import { CompareModal, ExportModal, FeedbackModal, RequestDocModal, rate, reportConflict, type ExportItem } from "@/components/modals";
 
 const SUGGESTIONS: [string, string][] = [
   ["One source", "How many casual leaves can teaching staff take?"],
@@ -52,7 +53,7 @@ function Ask() {
     const aiMsg: Msg = { id: nid("m"), role: "ai", q, pending: true };
     let chat = useStore.getState().chats.find((c) => c.id === useStore.getState().activeChat);
     if (!chat) {
-      chat = { id: nid("ch"), title: q.length > 48 ? q.slice(0, 46) + "…" : q, msgs: [userMsg, aiMsg], saved: false, when: "Today" };
+      chat = { id: nid("ch"), title: q.length > 48 ? q.slice(0, 46) + "…" : q, msgs: [userMsg, aiMsg], saved: false, at: new Date().toISOString() };
       set({ activeChat: chat.id });
     } else {
       chat = { ...chat, msgs: [...chat.msgs, userMsg, aiMsg] };
@@ -69,8 +70,7 @@ function Ask() {
         // Earlier questions in this chat, so a follow-up like "and in 2023?" can be rewritten in full.
         history: chat.msgs.filter((m): m is Extract<Msg, { role: "user" }> => m.role === "user").map((m) => m.text).slice(0, -1),
       });
-      finish(chat.id, aiMsg.id, { answer });
-      if (answer.label === "Insufficient evidence") logUnanswered(q);
+      finish(chat.id, aiMsg.id, { answer });  // unanswered questions are logged by the server
     } catch (e) {
       finish(chat.id, aiMsg.id, { error: (e as Error).message });
     }
@@ -82,20 +82,13 @@ function Ask() {
     void save("chats", { ...chat, msgs: chat.msgs.map((m) => (m.id === msgId ? { ...m, pending: false, ...patch } : m)) });
   }
 
-  function logUnanswered(q: string) {
-    const st = useStore.getState();
-    const existing = st.unanswered.find((u) => u.q.toLowerCase() === q.toLowerCase());
-    if (existing) void save("unanswered", { ...existing, count: existing.count + 1, last: new Date().toLocaleDateString("en-CA") });
-    else void save("unanswered", { id: nid("u"), q, count: 1, dept: "Human Resources", status: "Open", last: new Date().toLocaleDateString("en-CA") });
-  }
-
   function onCite(msg: Extract<Msg, { role: "ai" }>, i: number) {
     const c = msg.answer?.cites[i];
     if (c) openViewer({ doc: c.doc, page: c.page, block: c.block, quote: c.quote, cites: msg.answer!.cites, idx: i, msg: msg.id });
   }
 
   const groups: Record<string, Chat[]> = {};
-  s.chats.forEach((c) => { (groups[c.when] ??= []).push(c); });
+  s.chats.forEach((c) => { (groups[chatGroup(c)] ??= []).push(c); });
 
   return (
     <div className={`chat ${histOpen ? "histopen" : ""}`}>
@@ -129,9 +122,10 @@ function Ask() {
             <Icon n="layers" s /><span>Scope:</span><b>{scopeLabel(s)}</b><Icon n="cd" s /></button>
           <button className="scopebtn" onClick={() => openModal({ title: "Filter the documents searched", body: <FiltersModal /> })} type="button">
             <Icon n="filter" s />Filters{filterCount(s) > 0 && <span className="fcount">{filterCount(s)}</span>}</button>
-          {active && active.msgs.length > 0 && (
+          {active && active.msgs.length > 0 && <>
+            <button className="btn ghost sm" type="button" onClick={() => openModal({ title: "Export cited summary", wide: true, body: <ExportModal title={active.title} items={exportItems(active)} /> })}><Icon n="export" s /> Export</button>
             <button className="btn ghost sm" onClick={() => saveChat(active)} type="button"><Icon n="save" s /> {active.saved ? "Saved" : "Save"}</button>
-          )}
+          </>}
         </div>
 
         <div className="msgs" ref={msgsRef}>
@@ -162,9 +156,9 @@ function Ask() {
     </div>
   );
 
-  function saveChat(chat: Chat) {
-    if (chat.saved) { void save("chats", { ...chat, saved: false }); toast("Removed from saved conversations"); return; }
-    void save("chats", { ...chat, saved: true, savedName: chat.title }); toast("Conversation saved");
+  async function saveChat(chat: Chat) {
+    if (await save("chats", { ...chat, saved: !chat.saved, savedName: chat.savedName ?? chat.title }))
+      toast(chat.saved ? "Removed from saved conversations" : "Conversation saved");
   }
 }
 
@@ -184,37 +178,51 @@ function Message({ m, onCite, onAsk, toast, save, chat }: {
   );
   if (!m.answer) return null;
   const a = m.answer;
+  const ai = m as Extract<Msg, { role: "ai" }>;
   const lang = isHindi(m.q) ? "hi" : "en";
   const bm = s.bm_answers.some((b) => b.msg === m.id);
+  const cited = [...new Set(a.cites.map((c) => c.doc))];
+  const { openModal } = useStore.getState();
 
   return (
     <div className="ma" id={m.id}><div className="bot"><Icon n="spark" /></div><div className="box">
-      <div className="mh"><b>SVSU Assistant</b><span className={`pill plain ${KIND_INFO[a.label] ?? "mute"}`}>{a.label}</span>
+      <div className="mh"><b>SVSU Assistant</b>{aiSettings(s).showConf && <span className={`pill plain ${KIND_INFO[a.label] ?? "mute"}`}>{a.label}</span>}
         <span>From documents</span></div>
       {a.queries && a.queries.length > 0 && (
         <div className="searched"><Icon n="search" s /><span>Searched for: {a.queries.join(" · ")}</span></div>
       )}
-      <AnswerView answer={a} msgId={m.id} lang={lang} onCite={(i) => onCite(m as Extract<Msg, { role: "ai" }>, i)} onAsk={onAsk} />
+      <AnswerView answer={a} msgId={m.id} lang={lang} onCite={(i) => onCite(ai, i)} onAsk={onAsk} />
+      {a.label === "Conflicting instructions" && cited.length >= 2 && (
+        <div className="mb row">
+          <button className="btn sm" type="button" onClick={() => openModal({ title: "Compare documents", wide: true, body: <CompareModal a={cited[0]} b={cited[1]} topic={m.q} /> })}>Compare both documents</button>
+          <button className="btn sm ghost" type="button" onClick={() => void reportConflict(cited.slice(0, 2), m.q)}>Report conflict</button>
+        </div>
+      )}
+      {a.label === "Insufficient evidence" && (
+        <div className="mb row"><button className="btn sm" type="button" onClick={() => openModal({ title: "Request a document", body: <RequestDocModal q={m.q} dept={s.session?.dept} /> })}><Icon n="file" s /> Request a document</button></div>
+      )}
+      {a.label === "Outside your scope" && (
+        <div className="mb row"><button className="btn sm pri" type="button" onClick={() => { clearScope(); onAsk(m.q); }}>Search all permitted documents</button></div>
+      )}
       <div className="macts">
         <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(answerText(a)); toast("Copied"); }} type="button"><Icon n="copy" s /> Copy</button>
-        <button className={`btn ghost ${bm ? "on" : ""}`} type="button" onClick={() => {
-          if (bm) { const b = s.bm_answers.find((x) => x.msg === m.id); if (b) useStore.getState().remove("bm_answers", b.id); toast("Bookmark removed"); }
-          else { void save("bm_answers", { id: nid("ba"), chat: chat.id, msg: m.id, q: m.q, when: new Date().toLocaleDateString("en-IN") }); toast("Answer bookmarked"); }
+        <button className={`btn ghost ${bm ? "on" : ""}`} type="button" onClick={async () => {
+          const b = s.bm_answers.find((x) => x.msg === m.id);
+          if (b) { if (await useStore.getState().remove("bm_answers", b.id)) toast("Bookmark removed"); }
+          else if (await save("bm_answers", { id: nid("ba"), chat: chat.id, msg: m.id, q: m.q, when: todayIso() })) toast("Answer bookmarked");
         }}><Icon n="bm" s /> {bm ? "Bookmarked" : "Bookmark"}</button>
+        <button className="btn ghost" type="button" onClick={() => openModal({ title: "Export cited summary", wide: true, body: <ExportModal title={m.q} items={[{ q: m.q, answer: a }]} /> })}><Icon n="export" s /> Export</button>
         <span style={{ flex: 1 }} />
-        <button className={`btn ghost ${m.fb === "up" ? "on" : ""}`} aria-label="Helpful" type="button" onClick={() => rate(m, chat, "up")}><Icon n="up" s /></button>
-        <button className={`btn ghost ${m.fb === "down" ? "on" : ""}`} aria-label="Not helpful" type="button" onClick={() => rate(m, chat, "down")}><Icon n="down" s /></button>
+        <button className={`btn ghost ${m.fb === "up" ? "on" : ""}`} aria-label="Helpful" type="button" onClick={() => void rate(chat, ai, "up")}><Icon n="up" s /></button>
+        <button className={`btn ghost ${m.fb === "down" ? "on" : ""}`} aria-label="Not helpful" type="button" onClick={() => openModal({ title: "What was wrong with this answer?", body: <FeedbackModal chat={chat} m={ai} /> })}><Icon n="down" s /></button>
       </div>
     </div></div>
   );
 }
 
-function rate(m: Extract<Msg, { role: "ai" }>, chat: Chat, v: "up" | "down") {
-  const st = useStore.getState();
-  const who = st.session?.name ?? "User";
-  void st.save("chats", { ...chat, msgs: chat.msgs.map((x) => (x.id === m.id ? { ...x, fb: v } : x)) });
-  void st.save("feedback", { id: nid("f"), q: m.q, rating: v, reason: "", comment: "", who, when: new Date().toLocaleDateString("en-IN") });
-  st.toast(v === "up" ? "Thanks — marked helpful" : "Thanks — marked not helpful");
+/** Question-and-answer pairs of a chat, for export. */
+function exportItems(chat: Chat): ExportItem[] {
+  return chat.msgs.flatMap((m) => (m.role === "ai" && m.answer ? [{ q: m.q, answer: m.answer }] : []));
 }
 
 function Welcome({ onAsk }: { onAsk: (q: string) => void }) {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getDoc, permitted, useStore } from "@/lib/store";
+import { getDoc, ownsItem, permitted, useStore } from "@/lib/store";
 import { todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Field, Pill } from "@/components/ui";
@@ -17,26 +17,29 @@ export default function CollectionDetail() {
   const { save, remove, set, toast, openModal, closeModal } = useStore.getState();
   if (!co) return <div className="wrap"><div className="empty">Collection not found.</div></div>;
   const ds = co.docs.map((d) => getDoc(s, d)).filter(Boolean);
+  const mine = ownsItem(s, co);
 
   const askColl = () => { set({ scope: { mode: "collection", files: [], coll: co.id }, activeChat: null }); toast("Scope set to this collection"); router.push("/ask"); };
-  const removeDoc = (docId: string) => { void save("collections", { ...co, docs: co.docs.filter((x) => x !== docId), updated: todayIso() }); toast("Removed from collection"); };
+  const removeDoc = async (docId: string) => { if (await save("collections", { ...co, docs: co.docs.filter((x) => x !== docId), updated: todayIso() })) toast("Removed from collection"); };
   const del = () => openModal({
     title: "Delete collection?",
     body: <p>Delete <b>{co.name}</b>? The {co.docs.length} documents in it are not deleted.</p>,
     foot: <><button className="btn" onClick={closeModal} type="button">Cancel</button>
-      <button className="btn danger" type="button" onClick={() => { void remove("collections", co.id); closeModal(); toast("Collection deleted"); router.push("/collections"); }}>Delete collection</button></>,
+      <button className="btn danger" type="button" onClick={async () => { closeModal(); if (await remove("collections", co.id)) { toast("Collection deleted"); router.push("/collections"); } }}>Delete collection</button></>,
   });
 
   return (
     <div className="wrap">
       <div className="crumb"><Link href="/collections">Collections</Link><Icon n="cr" s /><span>{co.name}</span></div>
       <div className="pagehead">
-        <div><h2>{co.name}</h2><p>{co.desc}</p></div>
+        <div><h2>{co.name}</h2><p>{co.desc}{co.ownerName && <span className="muted"> · by {co.ownerName}</span>}</p></div>
         <div className="row">
           <button className="btn pri" onClick={askColl} type="button"><Icon n="spark" s /> Ask this collection</button>
-          <button className="btn" onClick={() => openModal({ title: "Add documents", body: <AddDocs co={co} /> })} type="button"><Icon n="plus" s /> Add documents</button>
-          <button className="btn" onClick={() => openModal({ title: "Rename collection", body: <RenameColl co={co} /> })} type="button"><Icon n="edit" s /> Rename</button>
-          <button className="btn danger" onClick={del} type="button"><Icon n="trash" s /> Delete</button>
+          {mine && <>
+            <button className="btn" onClick={() => openModal({ title: "Add documents", body: <AddDocs co={co} /> })} type="button"><Icon n="plus" s /> Add documents</button>
+            <button className="btn" onClick={() => openModal({ title: "Rename collection", body: <RenameColl co={co} /> })} type="button"><Icon n="edit" s /> Rename</button>
+            <button className="btn danger" onClick={del} type="button"><Icon n="trash" s /> Delete</button>
+          </>}
         </div>
       </div>
       <div className="card">
@@ -44,7 +47,7 @@ export default function CollectionDetail() {
           <div key={d.id} className="li"><Ft k={d.fileType} />
             <div className="main"><b>{d.title}</b><span className="mono">{d.ref}</span> <span>· {d.dept}</span></div><Pill status={d.status} />
             <Link className="btn sm" href={`/library/${d.id}`}>Open</Link>
-            <button className="iconbtn" aria-label="Remove from collection" onClick={() => removeDoc(d.id)} type="button"><Icon n="x" s /></button>
+            {mine && <button className="iconbtn" aria-label="Remove from collection" onClick={() => removeDoc(d.id)} type="button"><Icon n="x" s /></button>}
           </div>
         )) : <div className="empty">This collection is empty. Add documents to start.</div>}
       </div>
@@ -69,7 +72,7 @@ function AddDocs({ co }: { co: Collection }) {
       </div>
       <div className="mft" style={{ position: "static", borderTop: "1px solid var(--line)", marginTop: 4, paddingTop: 12 }}>
         <button className="btn" onClick={closeModal} type="button">Cancel</button>
-        <button className="btn pri" type="button" onClick={() => { void save("collections", { ...co, docs: [...co.docs, ...sel], updated: todayIso() }); closeModal(); toast(`${sel.length} document(s) added`); }}>Add selected</button>
+        <button className="btn pri" type="button" onClick={async () => { if (await save("collections", { ...co, docs: [...co.docs, ...sel], updated: todayIso() })) { closeModal(); toast(`${sel.length} document(s) added`); } }}>Add selected</button>
       </div>
     </>
   );
@@ -85,7 +88,7 @@ function RenameColl({ co }: { co: Collection }) {
       <Field label="Description"><textarea className="inp" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
       <div className="mft" style={{ position: "static", borderTop: "1px solid var(--line)", marginTop: 4, paddingTop: 12 }}>
         <button className="btn" onClick={closeModal} type="button">Cancel</button>
-        <button className="btn pri" type="button" onClick={() => { void save("collections", { ...co, name, desc, updated: todayIso() }); closeModal(); toast("Collection updated"); }}>Save</button>
+        <button className="btn pri" type="button" onClick={async () => { if (await save("collections", { ...co, name, desc, updated: todayIso() })) { closeModal(); toast("Collection updated"); } }}>Save</button>
       </div>
     </>
   );

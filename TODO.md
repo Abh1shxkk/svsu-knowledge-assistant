@@ -1,39 +1,30 @@
 # What's left
 
-How to build all of this — order, design and effort — is in [docs/PLAN.md](docs/PLAN.md).
+The October 2026 scan's fixes are recorded in [docs/FIXES.md](docs/FIXES.md); longer-term work and
+its design are in [docs/PLAN.md](docs/PLAN.md).
 
-Current state: login, all 12 screens, uploads with OCR (Tesseract, Hindi + English),
-search and cited answers from PostgreSQL + pgvector, light/dark themes — built and tested locally.
-Below is what still needs doing, most important first.
+Current state: login, all 12 screens and every prototype feature; uploads with OCR (Tesseract,
+Hindi + English), duplicate checks and drafts; cited answers from PostgreSQL + pgvector; access
+enforced on the server; notifications and reminders; Word/PDF export; light and dark themes.
+Tested by 35 backend tests (policy + API) and 3 browser journeys.
 
-## 1. Must fix before real staff use it
-- [x] **Server-side permissions.** One access policy (`backend/app/policy.py`, 23 unit tests) now
-      filters everything the browser receives and everything `/ask` may cite; writes are checked per
-      role, chats/bookmarks are private, and the server writes the audit log.
-- [ ] **Real tables and paginated APIs** (Plan Phase 0.1, 0.3, 0.8) — `/records` still loads all of a
-      person's data at once; fine now, slow at thousands of documents.
-- [ ] **Keep the original files.** Uploads save only the extracted text. Store the original PDF / scan /
-      image and let people view and download it.
-- [x] **Remove sample data.** Removed (backup in `D:/PostgreSQL/backups/`); new databases start
-      empty unless `DEMO_DATA=true`.
-- [ ] **Real administrator.** `python -m app.cli create-admin` is ready — run it for the real admin,
-      then clear `DEV_ADMIN_USER` / `DEV_ADMIN_PASS` in `backend/.env`. Users can now change their
-      own password.
-- [ ] **Secrets.** Rotate the OpenAI API key (it was shared in chat) and set a long random `JWT_SECRET`.
+## 1. Owner actions (can't be done in code)
+- [ ] **Scrub the EMS server details from the public git history** (commands in docs/FIXES.md 1.1),
+      and tell IT the server address was public.
+- [ ] **Rotate the OpenAI key** and the **EMS password** that were shared in chat.
+- [ ] **Create the real administrator** (`python -m app.cli create-admin`), then clear
+      `DEV_ADMIN_USER` / `DEV_ADMIN_PASS` in `backend/.env`.
+- [ ] Schedule the daily backup (`python -m app.cli backup`) and try one restore.
 
-## 2. Prototype features still missing or simplified
-- [ ] Export an answer / conversation as a cited summary (PDF or Word)
-- [ ] Deadline reminders (email / ERP notification) and the notifications bell
-- [ ] Compare two documents side by side; "Report conflict" from an answer
-- [ ] "Request a document" and "Assign" for unanswered questions
-- [ ] Link related documents and "Add revision" from the document page
-- [ ] Admin: rename tags; make the access-level grid actually control access
+## 2. Before many people use it (PLAN.md)
+- [ ] **Real tables, migrations (Alembic) and paginated APIs** (Phase 0.1, 0.3, 0.8). Lists already
+      leave out document text, but `/records` still sends every record a person may see.
+- [ ] **Keep the original files** (Phase 1.1) — today only the extracted text is stored.
+- [ ] **Background processing for uploads** (Phase 1.2) — OCR no longer blocks other people, but a
+      long scan still keeps the uploader waiting.
+- [ ] Secure-cookie sessions instead of a token in the browser (Phase 0.7).
 
-## 3. Not tested or not set up yet
-- [ ] **Hindi OCR quality** — about 77% on a test scan; Hindi uploads need a human check of the
-      extracted text before submitting
-- [ ] Automated tests (backend API + key screens)
-- [ ] Production deployment: a server, a production PostgreSQL with the `vector` extension
-      (`DATABASE_URL`), HTTPS, and process management
-- [ ] Update `docs/instructions.md`, `docs/design.md`, `docs/rules.md` — they still describe the
-      EMS connection, SQLite and the old green theme
+## 3. Not set up yet
+- [ ] Hindi OCR quality — about 62–77% on test scans; check Hindi text before submitting.
+- [ ] Production deployment: server, managed PostgreSQL with `vector`, HTTPS, `CORS_ORIGINS`,
+      SMTP for reminder emails.

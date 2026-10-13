@@ -42,9 +42,7 @@ _SYSTEM = (
     'cites: one per excerpt you used, [{"excerpt": n, "quote": "the exact words copied from excerpt n '
     'that support your claim, at most 20 words"}].\n'
     "follow: up to 3 short follow-up questions the records could answer.\n"
-    "Rules: Prefer Active documents. Use Superseded or Expired documents only for historical questions "
-    "or to compare old and new rules, and say so (label Revised policy or Historical record, with a "
-    "banner). If two Active documents disagree, label Conflicting instructions with a conflict banner and "
+    "Rules: Prefer Active documents. {history_rule} If two Active documents disagree, label Conflicting instructions with a conflict banner and "
     "present both. If the excerpts do not answer the question, label Insufficient evidence with an insuff "
     "banner and say what the closest document does cover. If the question is too vague, label Needs "
     "clarification and offer 3 to 5 specific questions in an opts block. Never use outside knowledge. "
@@ -82,6 +80,18 @@ def _search(vector: list[float], ids: list[str], limit: int) -> list[dict]:
          .where(blocks.c.doc_id.in_(ids)).order_by(dist).limit(limit))
     with engine.connect() as c:
         return [dict(r._mapping) for r in c.execute(q)]
+
+
+def similar(doc_id: str, ids: list[str], probes: int = 5) -> dict[str, float]:
+    """Other documents (among ids) whose paragraphs most closely match this one's first paragraphs."""
+    with engine.connect() as c:
+        vectors = list(c.scalars(select(blocks.c.embedding).where(blocks.c.doc_id == doc_id)
+                                 .order_by(blocks.c.id).limit(probes)))
+    best: dict[str, float] = {}
+    for v in vectors:
+        for h in _search(list(v), [i for i in ids if i != doc_id], 1):
+            best[h["doc_id"]] = max(best.get(h["doc_id"], 0.0), h["score"])
+    return best
 
 
 _REWRITE = (
@@ -125,8 +135,16 @@ def _search_all(vectors: list[list[float]], ids: list[str], limit: int) -> list[
     return picked
 
 
+_HISTORY_RULES = {
+    True: "Use Superseded or Expired documents only for historical questions or to compare old and new "
+          "rules, and say so (label Revised policy or Historical record, with a banner).",
+    False: "Superseded or Expired documents may be used, but always say they are no longer in force "
+           "(label Revised policy or Historical record, with a banner).",
+}
+
+
 def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: dict, lang: str,
-           history: list[str] = ()) -> dict:
+           history: list[str] = (), ai: dict | None = None) -> dict:
     """docs: id -> document record. Answers only from answerable documents inside the scope.
 
     1. the LLM rewrites the question into search queries, 2. semantic search finds the paragraphs,
@@ -135,8 +153,9 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     usable = lambda ids: [i for i in ids if i in docs and docs[i]["status"] in ANSWERABLE]  # noqa: E731
     queries = rewrite(question, list(history))
     vectors = embed(queries)
-    hits = _search_all(vectors, usable(scope_ids), settings.top_k)
-    result = _generate(question, hits, docs, lang) if hits else dict(_INSUFFICIENT)
+    ai = ai or {}
+    hits = _search_all(vectors, usable(scope_ids), int(ai.get("maxSources") or settings.top_k))
+    result = _generate(question, hits, docs, lang, ai.get("histOnly", True) is not False) if hits else dict(_INSUFFICIENT)
     result["queries"] = queries[1:] or queries
     if result["label"] == "Insufficient evidence" and set(scope_ids) != set(permitted_ids):
         # Nothing in scope, but maybe in documents the person narrowed away: say which.
@@ -155,13 +174,14 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     return result
 
 
-def _generate(question: str, hits, docs: dict, lang: str) -> dict:
+def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True) -> dict:
     def excerpt(n, p):
         d = docs[p["doc_id"]]
         dates = f"effective {d.get('effective') or '?'}" + (f" to {d['expiry']}" if d.get("expiry") else "")
         return f"[{n}] \"{d['title']}\" ({d['ref']}; {d['status']}; {dates}; page {p['page']})\n{p['text']}"
 
-    res = chat(_SYSTEM.replace("{lang}", LANGS.get(lang, LANGS["auto"])),
+    system = _SYSTEM.replace("{lang}", LANGS.get(lang, LANGS["auto"])).replace("{history_rule}", _HISTORY_RULES[hist_only])
+    res = chat(system,
                "Excerpts:\n" + "\n\n".join(excerpt(n, h) for n, h in enumerate(hits, 1))
                + f"\n\nQuestion: {question}", as_json=True)
     # Renumber excerpt references {n} as 1, 2, 3… in the order they first appear in the answer.

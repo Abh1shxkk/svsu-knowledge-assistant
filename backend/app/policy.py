@@ -9,7 +9,8 @@ APPROVERS = {"Administrator", "Approver"}
 UPLOADERS = APPROVERS | {"Uploader"}
 HIDDEN = {"Pending", "Draft", "Changes requested", "Rejected"}  # not published yet
 ANSWERABLE = {"Active", "Superseded", "Expired"}               # the assistant may cite these
-OWNED = {"chats", "bm_answers", "bm_passages"}                 # private to the person who made them
+EDITABLE = {"Draft", "Pending", "Changes requested"}            # an uploader may still change their own
+OWNED = {"chats", "bm_answers", "bm_passages", "reminders", "prefs"}  # private to the person who made them
 DEFAULT_MATRIX = {"Administrator": [1, 1, 1, 1], "Approver": [1, 1, 1, 1],
                   "Uploader": [1, 1, 1, 0], "Viewer": [1, 1, 1, 0]}
 
@@ -57,12 +58,14 @@ def visible_records(user: dict, records: dict[str, list[dict]]) -> dict[str, lis
     ids = {d["id"] for d in docs}
     mine = lambda x: x.get("owner") == me or (role == "Administrator" and not x.get("owner"))  # noqa: E731
     return {
-        "documents": docs,
+        "documents": [{k: v for k, v in d.items() if k != "pages"} for d in docs],  # text loads per document
         "deadlines": [x for x in records["deadlines"] if x.get("doc") in ids],
         "collections": [{**c, "docs": [i for i in c.get("docs", []) if i in ids]} for c in records["collections"]],
         "chats": [x for x in records["chats"] if mine(x)],
         "bm_answers": [x for x in records["bm_answers"] if mine(x)],
         "bm_passages": [x for x in records["bm_passages"] if mine(x) and x.get("doc") in ids],
+        "reminders": [x for x in records.get("reminders", []) if x.get("owner") == me],
+        "prefs": [x for x in records.get("prefs", []) if x.get("owner") == me],
         "unanswered": records["unanswered"],
         "feedback": records["feedback"] if role in APPROVERS else [],
         "conflicts": records["conflicts"] if role in APPROVERS else [],
@@ -76,8 +79,8 @@ def write_error(user: dict, kind: str, new: dict | None, old: dict | None, ctx: 
     """None if this person may save `new` over `old` (new=None means delete), else the reason."""
     role, me = user.get("role", "Viewer"), user.get("login_id")
     admin = role == "Administrator"
-    if kind == "audit":
-        return "The audit log is written by the server."
+    if kind in ("audit", "questions"):
+        return "This is written by the server."
     if kind in ("users", "settings"):
         return None if admin else "Only administrators can change this."
     if kind in OWNED or kind == "collections":
@@ -90,15 +93,20 @@ def write_error(user: dict, kind: str, new: dict | None, old: dict | None, ctx: 
             return "Document not found."
         if new is None:
             return None if admin else "Only administrators can delete documents."
-        status, before = new.get("status"), (old or {}).get("status")
-        if role not in APPROVERS and status != before:
-            # Uploaders only ever submit: a new document, or their own after changes were requested.
-            own = old is None or old.get("uploader_id") == me
-            if not (status == "Pending" and own):
+        if new.get("visibility") not in ctx.vis:
+            return "Choose who can see this document."
+        if role not in APPROVERS:
+            # Uploaders only work on their own unpublished documents, and can only save or submit them.
+            if old is not None and (old.get("uploader_id") != me or old.get("status") not in EDITABLE):
+                return "Only approvers can change a published document."
+            if new.get("status") not in ("Draft", "Pending"):
                 return "Only approvers can publish, reject or withdraw documents."
         return None
     if kind == "deadlines":
         return None if role in UPLOADERS else "Only uploaders, approvers and administrators can change deadlines."
-    if kind in ("feedback", "unanswered", "conflicts"):
-        return None if new is not None or role in APPROVERS else "Only approvers can delete this."
+    if kind in ("feedback", "conflicts"):  # anyone may add one; approvers manage them
+        own = kind == "feedback" and old is not None and old.get("owner") == me and new is not None
+        return None if old is None and new is not None or own or role in APPROVERS else "Only approvers can change this."
+    if kind == "unanswered":  # logged by the server; approvers assign and close them
+        return None if role in APPROVERS else "Only approvers can change this."
     return "Unknown record kind."

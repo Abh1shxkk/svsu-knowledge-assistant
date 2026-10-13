@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { canApprove, canUpload, getDoc, me, permitted, useStore } from "@/lib/store";
+import { canApprove, canUpload, chatGroup, getDoc, me, permitted, useStore } from "@/lib/store";
 import { daysTo, fmtD, isHindi, plural, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { KIND_INFO } from "@/components/answer";
@@ -94,7 +94,7 @@ export default function Dashboard() {
                 const label = lastLabel(c.msgs);
                 return (
                   <Row key={c.id} href={`/ask?c=${c.id}`} lead={<span className="av" style={{ width: 30, height: 30, borderRadius: 10 }}><Icon n="chat" s /></span>}
-                    title={c.title} meta={`${c.when} · ${plural(Math.ceil(c.msgs.length / 2), "question")}`}
+                    title={c.title} meta={`${chatGroup(c)} · ${plural(Math.ceil(c.msgs.length / 2), "question")}`}
                     trail={label ? <span className={`pill plain ${KIND_INFO[label] ?? "mute"}`}>{label}</span> : undefined} />
                 );
               }) : <div className="empty">No conversations yet. Ask a question to start.</div>}

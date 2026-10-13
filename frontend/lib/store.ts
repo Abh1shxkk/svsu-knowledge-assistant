@@ -1,10 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { create } from "zustand";
 import { api, getToken, setToken, type SessionUser } from "./api";
 import type { AiSettings, Cite, Doc, Kind, Lists, Records } from "./types";
-import { initials, nid } from "./util";
+import { initials, nid, todayIso } from "./util";
 
 export type Viewer = {
   doc: string; page?: number; block?: string; quote?: string; zoom: number;
@@ -17,17 +17,21 @@ export type Modal = { title: string; body: ReactNode; foot?: ReactNode; wide?: b
 const NO_FILTERS: Filters = { dept: "", subject: "", type: "", from: "", to: "" };
 const EMPTY: Records = {
   documents: [], collections: [], deadlines: [], chats: [], bm_answers: [], bm_passages: [], feedback: [],
-  unanswered: [], conflicts: [], users: [], audit: [], settings: [],
+  unanswered: [], conflicts: [], users: [], audit: [], settings: [], reminders: [], prefs: [],
 };
 
 type State = Records & {
   loaded: boolean; error: string; session: SessionUser | null;
   scope: Scope; filters: Filters; ansLang: string; activeChat: string | null;
   viewer: Viewer | null; modal: Modal; toasts: { id: string; msg: string }[];
+  /** Documents opened in full (with their text), by id. */
+  full: Record<string, Doc>;
   load: () => Promise<void>;
+  loadDoc: (id: string) => Promise<Doc | undefined>;
   logout: () => void;
-  save: <K extends Kind>(kind: K, item: Records[K][number]) => Promise<void>;
-  remove: (kind: Kind, id: string) => Promise<void>;
+  /** Saves on the server; the screen updates at once and goes back if the server refuses. Resolves true if saved. */
+  save: <K extends Kind>(kind: K, item: Records[K][number]) => Promise<boolean>;
+  remove: (kind: Kind, id: string) => Promise<boolean>;
   toast: (msg: string) => void;
   openModal: (m: NonNullable<Modal>) => void;
   closeModal: () => void;
@@ -40,27 +44,52 @@ export const useStore = create<State>((set, get) => ({
   ...EMPTY,
   loaded: false, error: "", session: null,
   scope: { mode: "all", files: [], coll: null }, filters: NO_FILTERS, ansLang: "auto", activeChat: null,
-  viewer: null, modal: null, toasts: [],
+  viewer: null, modal: null, toasts: [], full: {},
 
   load: async () => {
     if (!getToken()) { set({ error: "no-session" }); return; }
     try {
       const [session, records] = await Promise.all([api.me(), api.records()]);
-      set({ ...records, session, loaded: true, error: "" });
+      const first = !get().loaded;
+      set({ ...records, session, loaded: true, error: "", full: {} });
+      if (first) set({ ansLang: aiSettings(get()).lang || "auto" });
     } catch (e) {
       set({ error: (e as Error).message });
     }
   },
+  loadDoc: async (id) => {
+    if (get().full[id]) return get().full[id];
+    try {
+      const doc = await api.document(id);
+      set({ full: { ...get().full, [id]: doc } });
+      return doc;
+    } catch { return undefined; }
+  },
   logout: () => { setToken(null); set({ session: null, loaded: false }); location.href = "/login"; },
   save: async (kind, item) => {
+    const before = { [kind]: get()[kind], full: get().full } as Partial<State>;
     const list = get()[kind] as { id: string }[];
     const i = list.findIndex((x) => x.id === item.id);
-    set({ [kind]: i < 0 ? [item, ...list] : list.map((x) => (x.id === item.id ? item : x)) } as Partial<State>);
-    try { await api.put(kind, item.id, item); } catch (e) { get().toast(`Couldn't save: ${(e as Error).message}`); }
+    let shown: { id: string } = item;
+    const patch: Partial<State> = {};
+    if (kind === "documents") {  // lists hold details only; the text lives in `full`
+      const { pages, ...meta } = item as Doc;
+      shown = meta;
+      const cached = get().full[item.id];
+      if (pages || cached) patch.full = { ...get().full, [item.id]: { ...cached, ...meta, pages: pages ?? cached?.pages } as Doc };
+    }
+    set({ ...patch, [kind]: i < 0 ? [shown, ...list] : list.map((x) => (x.id === item.id ? shown : x)) } as Partial<State>);
+    try { await api.put(kind, item.id, item); return true; }
+    catch (e) { set(before); get().toast(`Not saved: ${(e as Error).message}`); return false; }
   },
   remove: async (kind, id) => {
+    const before = { [kind]: get()[kind] } as Partial<State>;
     set({ [kind]: (get()[kind] as { id: string }[]).filter((x) => x.id !== id) } as Partial<State>);
-    try { await api.remove(kind, id); } catch (e) { get().toast(`Couldn't delete: ${(e as Error).message}`); }
+    try {
+      await api.remove(kind, id);
+      if (kind === "documents") void get().load();  // the server also removed its deadlines, bookmarks and links
+      return true;
+    } catch (e) { set(before); get().toast(`Not deleted: ${(e as Error).message}`); return false; }
   },
   toast: (msg) => {
     const id = nid("t");
@@ -80,8 +109,11 @@ export const role = (s: Pick<S, "session">) => s.session?.role ?? "Viewer";
 export const canUpload = (s: Pick<S, "session">) => ["Administrator", "Approver", "Uploader"].includes(role(s));
 export const canApprove = (s: Pick<S, "session">) => ["Administrator", "Approver"].includes(role(s));
 export const isAdmin = (s: Pick<S, "session">) => role(s) === "Administrator";
-/** Full document access (sees Management Only and pending items). */
-export const fullAccess = (s: Pick<S, "session">) => canApprove(s);
+/** Uploaders may still change their own documents until they are published. */
+export const EDITABLE_ST = ["Draft", "Pending", "Changes requested"];
+export const isMine = (s: Pick<S, "session">, d: Doc) => !!d.uploader_id && d.uploader_id === s.session?.login_id;
+export const canEditDoc = (s: Pick<S, "session">, d: Doc) => canApprove(s) || (canUpload(s) && isMine(s, d) && EDITABLE_ST.includes(d.status));
+export const ownsItem = (s: Pick<S, "session">, x: { owner?: string }) => isAdmin(s) || !x.owner || x.owner === s.session?.login_id;
 
 export const me = (s: Pick<S, "session">) => {
   const u = s.session;
@@ -97,10 +129,18 @@ export const roleMatrix = (s: S) =>
   (s.settings.find((x) => x.id === "roles") as { matrix: Record<string, number[]> } | undefined)?.matrix ?? {};
 export const getDoc = (s: S, id: string) => s.documents.find((d) => d.id === id);
 
-export const permitted = (s: S): Doc[] =>
-  fullAccess(s) ? s.documents
-    : s.documents.filter((d) => d.visibility !== "Management Only" && !HIDDEN_ST.includes(d.status));
-export const answerable = (s: S) => permitted(s).filter((d) => !HIDDEN_ST.includes(d.status) && d.status !== "Withdrawn");
+/** A document with its full text, loaded on first use. */
+export function useFullDoc(id: string | undefined): Doc | undefined {
+  const doc = useStore((s) => (id ? s.full[id] : undefined));
+  const listed = useStore((s) => (id ? s.documents.some((d) => d.id === id) : false));
+  useEffect(() => { if (id && listed && !doc) void useStore.getState().loadDoc(id); }, [id, listed, doc]);
+  return doc;
+}
+
+/** The server sends only documents this person may see. */
+export const permitted = (s: S): Doc[] => s.documents;
+export const ANSWERABLE_ST = ["Active", "Superseded", "Expired"];
+export const answerable = (s: S) => s.documents.filter((d) => ANSWERABLE_ST.includes(d.status));
 
 export const scopeDocs = (s: S) => {
   let ds = answerable(s);
@@ -121,4 +161,12 @@ export const scopeLabel = (s: S) =>
 export const clearScope = () => useStore.setState({ scope: { mode: "all", files: [], coll: null }, filters: NO_FILTERS });
 
 const EMPTY_LISTS: Lists = { TAGS: [], AUDS: [], DEPTS: [], TYPES: [], AUTHS: [], INSTS: [], VIS: [], VIS_DESC: {} };
+/** "Today", "Yesterday", "Previous 7 days" or the month, from a chat's start time. */
+export const chatGroup = (c: { at?: string; when?: string }) => {
+  if (!c.at) return c.when || "Earlier";
+  const days = Math.floor((new Date(todayIso() + "T00:00:00").getTime() - new Date(c.at.slice(0, 10) + "T00:00:00").getTime()) / 864e5);
+  return days <= 0 ? "Today" : days === 1 ? "Yesterday" : days < 7 ? "Previous 7 days"
+    : new Date(c.at).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+};
+
 const DEFAULT_AI: AiSettings = { requireCite: true, histOnly: true, showConf: true, logUnans: true, lang: "auto", maxSources: 8 };

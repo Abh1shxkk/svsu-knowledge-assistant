@@ -5,8 +5,8 @@ import { api } from "@/lib/api";
 import { aiSettings, lists, roleMatrix, useStore } from "@/lib/store";
 import { initials } from "@/lib/util";
 import { Icon } from "@/components/icon";
-import { Field, Tabs } from "@/components/ui";
-import type { AiSettings, Lists } from "@/lib/types";
+import { Field, ModalFoot, Tabs } from "@/components/ui";
+import type { AiSettings, Lists, User } from "@/lib/types";
 
 const ROLES = ["Administrator", "Approver", "Uploader", "Viewer"];
 const CAPS: [string, number[]][] = [["Administrator", [1, 1, 1, 1]], ["Approver", [1, 1, 1, 0]], ["Uploader", [1, 1, 0, 0]], ["Viewer", [1, 0, 0, 0]]];
@@ -20,6 +20,8 @@ export default function AdminPage() {
   const matrix = roleMatrix(s);
 
   const saveLists = (patch: Partial<Lists>) => save("settings", { id: "lists", ...L, ...patch });
+  const saveAi = async (patch: Partial<AiSettings>) => { if (await save("settings", { id: "ai", ...ai, ...patch })) toast("AI settings saved"); };
+  const self = (u: User) => u.login_id === s.session?.login_id;
   const docsWith = (fn: (d: typeof s.documents[number]) => boolean) => s.documents.filter(fn).length;
 
   return (
@@ -35,12 +37,19 @@ export default function AdminPage() {
               <tbody>{s.users.map((u) => (
                 <tr key={u.id}><td><div className="row" style={{ flexWrap: "nowrap" }}><span className="av">{initials(u.name)}</span><div><b style={{ fontWeight: 500 }}>{u.name}</b><div className="xs muted">{u.email}</div></div></div></td>
                   <td>{u.dept}</td>
-                  <td><select className="inp" style={{ width: "auto", padding: "4px 8px" }} value={u.role} onChange={(e) => { void save("users", { ...u, role: e.target.value }); toast(`${u.name} is now ${e.target.value}`); }}>
+                  <td><select className="inp" style={{ width: "auto", padding: "4px 8px" }} value={u.role} disabled={self(u)} title={self(u) ? "You can't change your own role" : undefined}
+                    onChange={async (e) => { const role = e.target.value; if (await save("users", { ...u, role })) toast(`${u.name} is now ${role}`); }}>
                     {ROLES.map((r) => <option key={r}>{r}</option>)}</select></td>
                   <td>{u.last}</td><td>{u.active ? <span className="pill ok">Active</span> : <span className="pill mute">Deactivated</span>}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     {u.login_id && <button className="btn sm" onClick={() => openModal({ title: "Reset password", body: <ResetPassword loginId={u.login_id!} name={u.name} /> })} type="button">Reset password</button>}{" "}
-                    <button className="btn sm" onClick={() => { void save("users", { ...u, active: !u.active }); toast(u.active ? `${u.name} deactivated` : `${u.name} reactivated`); }} type="button">{u.active ? "Deactivate" : "Reactivate"}</button></td>
+                    <button className="btn sm" onClick={() => openModal({ title: "Edit user", body: <EditUser u={u} /> })} type="button">Edit</button>{" "}
+                    {!self(u) && <>
+                      <button className="btn sm" onClick={async () => { if (await save("users", { ...u, active: !u.active })) toast(u.active ? `${u.name} deactivated` : `${u.name} reactivated`); }} type="button">{u.active ? "Deactivate" : "Reactivate"}</button>{" "}
+                      <button className="btn sm danger" onClick={() => openModal({ title: "Delete user?", body: <p>Delete <b>{u.name}</b> ({u.login_id})? They will no longer be able to sign in. Their documents stay. To keep their history, deactivate them instead.</p>,
+                        foot: <><button className="btn" onClick={closeModal} type="button">Cancel</button>
+                          <button className="btn danger" type="button" onClick={async () => { closeModal(); if (await useStore.getState().remove("users", u.id)) toast(`${u.name} deleted`); }}>Delete user</button></> })} type="button">Delete</button>
+                    </>}</td>
                 </tr>
               ))}</tbody></table></div></div>
           <div className="card"><div className="card-h"><h3>What each role can do</h3></div>
@@ -57,7 +66,7 @@ export default function AdminPage() {
               <tbody>{Object.entries(matrix).map(([r, a]) => (
                 <tr key={r}><td>{r}</td>{a.map((x, i) => (
                   <td key={i}><input type="checkbox" checked={!!x} disabled={r === "Administrator"} aria-label={`${r} can see ${L.VIS[i]}`}
-                    onChange={(e) => { const m = { ...matrix, [r]: a.map((y, j) => (j === i ? (e.target.checked ? 1 : 0) : y)) }; void save("settings", { id: "roles", matrix: m }); toast("Access updated for " + r); }} /></td>
+                    onChange={async (e) => { const m = { ...matrix, [r]: a.map((y, j) => (j === i ? (e.target.checked ? 1 : 0) : y)) }; if (await save("settings", { id: "roles", matrix: m })) toast("Access updated for " + r); }} /></td>
                 ))}</tr>
               ))}</tbody></table></div></div>
           <div className="grid2">{L.VIS.map((v) => (
@@ -69,17 +78,18 @@ export default function AdminPage() {
 
       {tab === "tags" && (
         <div className="card"><div className="card-h"><h3>Subject tags</h3>
-          <AddToList placeholder="New tag name" onAdd={(t) => { if (L.TAGS.includes(t)) { toast("That tag already exists"); return; } void saveLists({ TAGS: [...L.TAGS, t] }); toast("Tag added"); }} /></div>
+          <AddToList placeholder="New tag name" onAdd={async (t) => { if (L.TAGS.includes(t)) { toast("That tag already exists"); return; } if (await saveLists({ TAGS: [...L.TAGS, t] })) toast("Tag added"); }} /></div>
           {L.TAGS.map((t) => { const n = docsWith((d) => d.tags.includes(t)); return (
             <div key={t} className="li"><Icon n="tag" s /><div className="main"><b>{t}</b><span>{n} document{n === 1 ? "" : "s"}</span></div>
-              <button className="btn sm danger" type="button" onClick={() => { if (n) { toast(`“${t}” is used on ${n} document(s). Remove it from those first.`); return; } void saveLists({ TAGS: L.TAGS.filter((x) => x !== t) }); toast("Tag deleted"); }}>Delete</button></div>
+              <button className="btn sm" type="button" onClick={() => openModal({ title: "Rename tag", body: <RenameTag tag={t} /> })}>Rename</button>
+              <button className="btn sm danger" type="button" onClick={async () => { if (n) { toast(`“${t}” is used on ${n} document(s). Remove it from those or rename the tag instead.`); return; } if (await saveLists({ TAGS: L.TAGS.filter((x) => x !== t) })) toast("Tag deleted"); }}>Delete</button></div>
           ); })}
         </div>
       )}
 
       {tab === "depts" && (
         <div className="card"><div className="card-h"><h3>Departments</h3>
-          <AddToList placeholder="New department" onAdd={(t) => { if (L.DEPTS.includes(t)) { toast("Already exists"); return; } void saveLists({ DEPTS: [...L.DEPTS, t] }); toast("Department added"); }} /></div>
+          <AddToList placeholder="New department" onAdd={async (t) => { if (L.DEPTS.includes(t)) { toast("Already exists"); return; } if (await saveLists({ DEPTS: [...L.DEPTS, t] })) toast("Department added"); }} /></div>
           {L.DEPTS.map((t) => { const n = docsWith((d) => d.dept === t); return (
             <div key={t} className="li"><Icon n="layers" s /><div className="main"><b>{t}</b><span>{n} documents · {s.users.filter((u) => u.dept === t).length} users</span></div></div>
           ); })}
@@ -99,11 +109,14 @@ export default function AdminPage() {
             <label key={k} className="li" style={{ cursor: "pointer" }}>
               <div className="main"><b>{label}</b><span style={{ whiteSpace: "normal" }}>{hint}</span></div>
               <input type="checkbox" checked={!!ai[k]} disabled={lock} style={{ width: 18, height: 18 }}
-                onChange={(e) => { void save("settings", { id: "ai", ...ai, [k]: e.target.checked }); toast("AI settings saved"); }} /></label>
+                onChange={(e) => void saveAi({ [k]: e.target.checked })} /></label>
           ))}
           <div className="li"><div className="main"><b>Default answer language</b><span>Used when the user hasn’t chosen one</span></div>
-            <select className="inp" style={{ width: "auto" }} value={ai.lang} onChange={(e) => { void save("settings", { id: "ai", ...ai, lang: e.target.value }); toast("AI settings saved"); }}>
+            <select className="inp" style={{ width: "auto" }} value={ai.lang} onChange={(e) => void saveAi({ lang: e.target.value })}>
               <option value="auto">Same as question</option><option value="en">English</option><option value="hi">हिन्दी</option></select></div>
+          <div className="li"><div className="main"><b>Passages read per answer</b><span>More gives fuller answers on broad questions, but costs more and takes longer</span></div>
+            <select className="inp" style={{ width: "auto" }} value={ai.maxSources} onChange={(e) => void saveAi({ maxSources: Number(e.target.value) })}>
+              {[4, 6, 8, 10, 12].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>
         </div>
       )}
     </div>
@@ -138,6 +151,42 @@ export default function AdminPage() {
       </>
     );
   }
+}
+
+function EditUser({ u }: { u: User }) {
+  const s = useStore();
+  const [f, setF] = useState({ name: u.name, email: u.email, dept: u.dept });
+  const submit = async () => {
+    if (!f.name.trim()) { s.toast("Enter a name"); return; }
+    if (await s.save("users", { ...u, ...f, name: f.name.trim() })) { s.closeModal(); s.toast("User updated"); }
+  };
+  return (
+    <>
+      <Field label="Full name" htmlFor="eu-n"><input className="inp" id="eu-n" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+      <div className="grid2">
+        <Field label="University email" htmlFor="eu-e"><input className="inp" id="eu-e" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label="Department" htmlFor="eu-d"><select className="inp" id="eu-d" value={f.dept} onChange={(e) => setF({ ...f, dept: e.target.value })}>{lists(s).DEPTS.map((d) => <option key={d}>{d}</option>)}</select></Field>
+      </div>
+      <p className="xs muted">Login ID {u.login_id} can&apos;t be changed. Change the role in the table.</p>
+      <ModalFoot><button className="btn" onClick={s.closeModal} type="button">Cancel</button><button className="btn pri" onClick={submit} type="button">Save</button></ModalFoot>
+    </>
+  );
+}
+
+function RenameTag({ tag }: { tag: string }) {
+  const s = useStore();
+  const [name, setName] = useState(tag);
+  const submit = async () => {
+    try { await api.renameTag(tag, name.trim()); s.closeModal(); s.toast("Tag renamed"); void s.load(); }
+    catch (e) { s.toast((e as Error).message); }
+  };
+  return (
+    <>
+      <Field label="New name" htmlFor="rt-n"><input className="inp" id="rt-n" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
+      <p className="xs muted">All documents with this tag will be updated.</p>
+      <ModalFoot><button className="btn" onClick={s.closeModal} type="button">Cancel</button><button className="btn pri" onClick={submit} type="button">Rename</button></ModalFoot>
+    </>
+  );
 }
 
 function ResetPassword({ loginId, name }: { loginId: string; name: string }) {

@@ -1,60 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getDoc, me, useStore } from "@/lib/store";
+import { api } from "@/lib/api";
+import { getDoc, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages } from "@/components/paper";
 import { fmtD, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Pill } from "@/components/ui";
 
+const CHECKLIST = ["Content matches the signed original", "Tags and audience are correct", "Access level is appropriate", "Older versions are linked"];
+
 export default function ReviewPage() {
   const s = useStore();
   const { save, toast } = useStore.getState();
   const queue = s.documents.filter((d) => ["Pending", "Changes requested"].includes(d.status));
-  const [selId, setSelId] = useState<string | null>(queue[0]?.id ?? null);
-  const [comment, setComment] = useState("");
-  const d = selId ? getDoc(s, selId) : queue[0];
+  const [selId, setSelId] = useState<string | null>(null);
+  const d = (selId && queue.find((x) => x.id === selId)) || queue[0];
+  const full = useFullDoc(d?.id);
+  // The comment, checklist and checks belong to the document on screen; switching documents starts afresh.
+  const [form, setForm] = useState({ id: "", comment: "", ticked: [] as number[] });
+  const { comment, ticked } = form.id === d?.id ? form : { comment: "", ticked: [] as number[] };
+  const setComment = (c: string) => setForm({ id: d!.id, comment: c, ticked });
+  const setTicked = (t: number[]) => setForm({ id: d!.id, comment, ticked: t });
+  const [loaded, setLoaded] = useState<{ id: string; list: [string, string][] } | null>(null);
+  const checks = loaded?.id === d?.id ? loaded!.list : null;
+  useEffect(() => {
+    const id = d?.id;
+    if (id) api.checks(id).then((list) => setLoaded({ id, list })).catch(() => setLoaded({ id, list: [["warn", "Automatic checks could not run"]] }));
+  }, [d?.id]);
 
   const decided = s.documents.flatMap((x) => x.approvals.filter((a) => /Approved|Rejected|Changes|Withdrawn/.test(a.step)).map((a) => ({ ...a, doc: x })))
     .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
-  const decide = (v: "approve" | "changes" | "reject") => {
+  const decide = async (v: "approve" | "changes" | "reject") => {
     if (!d) return;
     if (v !== "approve" && !comment.trim()) { toast("Add a comment for the uploader"); return; }
+    if (v === "approve" && ticked.length < CHECKLIST.length) { toast("Tick every item on the reviewer checklist first"); return; }
     const by = me(s).name;
-    const next = { ...d };
+    const [status, step, kind, msg] = {
+      approve: ["Active", "Approved and published", "ok", "Approved and published to the library"],
+      changes: ["Changes requested", "Changes requested", "warn", "Sent back to " + d.uploadedBy],
+      reject: ["Rejected", "Rejected", "bad", "Document rejected"],
+    }[v] as [typeof d.status, string, "ok" | "warn" | "bad", string];
+    if (!await save("documents", { ...d, status, approvals: [...d.approvals, { step, by, date: todayIso(), kind, note: comment }] })) return;
     if (v === "approve") {
-      next.status = "Active";
-      next.approvals = [...d.approvals, { step: "Approved and published", by, date: todayIso(), kind: "ok", note: comment }];
-      if (d.revisionOf) { const o = getDoc(s, d.revisionOf); if (o && o.status === "Active") void save("documents", { ...o, status: "Superseded", supersededBy: d.id }); }
-      toast("Approved and published to the library");
-    } else if (v === "changes") {
-      next.status = "Changes requested";
-      next.approvals = [...d.approvals, { step: "Changes requested", by, date: todayIso(), kind: "warn", note: comment }];
-      toast("Sent back to " + d.uploadedBy);
-    } else {
-      next.status = "Rejected";
-      next.approvals = [...d.approvals, { step: "Rejected", by, date: todayIso(), kind: "bad", note: comment }];
-      toast("Document rejected");
+      const now = () => useStore.getState();
+      const old = d.revisionOf ? getDoc(now(), d.revisionOf) : undefined;  // a published revision replaces the older document
+      if (old && old.status === "Active") await save("documents", { ...old, status: "Superseded", supersededBy: d.id });
+      for (const rid of d.related) {  // links chosen at upload become two-way
+        const o = getDoc(now(), rid);
+        if (o && !o.related.includes(d.id)) await save("documents", { ...o, related: [...o.related, d.id] });
+      }
     }
-    void save("documents", next);
-    setComment(""); setSelId(null);
+    toast(msg);
+    setSelId(null); setForm({ id: "", comment: "", ticked: [] });
   };
-
-  const checks = d ? [
-    ["ok", "Required fields complete"],
-    ["ok", "Reference number present"],
-    ["ok", "No conflicting active document found"],
-    d.visibility === "Management Only" ? ["warn", "Visibility is Management Only. Change to All Staff on approval if staff should see it."] : ["ok", "Visibility: " + d.visibility],
-    ["ok", `Text extracted from all ${d.pages.length} page(s)`],
-  ] as [string, string][] : [];
 
   return (
     <div className="wrap">
       <div className="pagehead"><div><h2>Review &amp; Approvals</h2><p>Documents are only used in the library and AI answers after an approver publishes them.</p></div><span className="pill warn">{queue.length} waiting</span></div>
 
-      {queue.length && d ? (
+      {d ? (
         <div className="rgrid">
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {queue.map((x) => (
@@ -67,14 +74,20 @@ export default function ReviewPage() {
           <div className="card">
             <div className="card-h"><div><h3>{d.title}</h3><span className="mono muted">{d.ref}</span></div><Link className="btn sm" href={`/library/${d.id}`}>Full record</Link></div>
             <div className="card-b rv2">
-              <div className="pagesbox" style={{ maxHeight: 560, padding: 14 }}><Pages doc={d} /></div>
+              <div className="pagesbox" style={{ maxHeight: 560, padding: 14 }}>{full ? <Pages doc={full} /> : <span className="spin" />}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
                 <dl className="kv" style={{ gridTemplateColumns: "110px 1fr" }}>
                   <dt>Type</dt><dd>{d.type}</dd><dt>Authority</dt><dd>{d.authority}</dd><dt>Effective</dt><dd>{fmtD(d.effective)}</dd>
                   <dt>Audience</dt><dd>{d.audience.join(", ")}</dd><dt>Tags</dt><dd>{d.tags.join(", ")}</dd><dt>Visibility</dt><dd>{d.visibility}</dd>
+                  {d.revisionOf && <><dt>Revises</dt><dd>{getDoc(s, d.revisionOf)?.ref ?? "—"}</dd></>}
                 </dl>
                 <div><b className="sm">Automatic checks</b><div className="checks" style={{ marginTop: 6 }}>
-                  {checks.map(([k, t], i) => <div key={i} className={`c ${k}`}><Icon n={k === "ok" ? "check" : "alert"} s /><span>{t}</span></div>)}</div></div>
+                  {checks ? checks.map(([k, t], i) => <div key={i} className={`c ${k}`}><Icon n={k === "ok" ? "check" : "alert"} s /><span>{t}</span></div>)
+                    : <div className="c"><span className="spin" /> Checking…</div>}</div></div>
+                <div><b className="sm">Reviewer checklist</b><div className="checks" style={{ marginTop: 6 }}>
+                  {CHECKLIST.map((t, i) => (
+                    <label key={t} className="c"><input type="checkbox" checked={ticked.includes(i)} onChange={() => setTicked(ticked.includes(i) ? ticked.filter((x) => x !== i) : [...ticked, i])} /> {t}</label>
+                  ))}</div></div>
                 <div className="fld"><label htmlFor="revc">Comment to uploader</label>
                   <textarea className="inp" id="revc" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Required when requesting changes or rejecting" /></div>
                 <div className="row">

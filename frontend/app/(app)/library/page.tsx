@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { canUpload, lists, permitted, useStore } from "@/lib/store";
-import { docText } from "@/components/paper";
+import { api } from "@/lib/api";
+import { canApprove, canUpload, lists, permitted, useStore } from "@/lib/store";
 import { fmtD, plural } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Pill, Tags } from "@/components/ui";
@@ -27,9 +27,19 @@ function Library() {
   // Seed search/status from the link once (e.g. a dashboard KPI or the top-bar search).
   const [L, setL] = useState<Lib>(() => ({ ...BLANK, q: params.get("q") ?? "", status: params.get("status") ?? "" }));
 
-  let ds = permitted(s);
+  // Searching the text inside documents happens on the server; the details are matched here too.
   const q = L.q.trim().toLowerCase();
-  if (q) ds = ds.filter((d) => (d.title + " " + d.ref + " " + d.description + " " + d.tags.join(" ") + " " + d.dept + " " + docText(d)).toLowerCase().includes(q));
+  const [found, setFound] = useState<{ q: string; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    if (!q) return;
+    const t = setTimeout(() => {
+      api.search(q).then((ids) => setFound({ q, ids: new Set(ids) })).catch(() => setFound({ q, ids: new Set() }));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+  const hits = found?.q === q ? found.ids : null;
+  let ds = permitted(s);
+  if (q) ds = ds.filter((d) => hits?.has(d.id) || (d.title + " " + d.ref + " " + d.description + " " + d.tags.join(" ") + " " + d.dept).toLowerCase().includes(q));
   if (L.subject) ds = ds.filter((d) => d.tags.includes(L.subject));
   if (L.dept) ds = ds.filter((d) => d.dept === L.dept);
   if (L.aud) ds = ds.filter((d) => d.audience.includes(L.aud));
@@ -74,7 +84,7 @@ function Library() {
           <div className="filters">
             {sel("subject", "Subject", L2.TAGS)}{sel("dept", "Department", L2.DEPTS)}{sel("aud", "Audience", L2.AUDS)}{sel("type", "Document type", L2.TYPES)}
             <div className="fld"><label>Status</label><select className="inp" value={L.status} onChange={(e) => set({ status: e.target.value })}>
-              <option value="">Any</option>{["Active", "Pending", "Superseded", "Withdrawn", "Expired"].map((v) => <option key={v}>{v}</option>)}</select></div>
+              <option value="">Any</option>{["Active", ...(canUpload(s) ? ["Draft", "Pending", "Changes requested", ...(canApprove(s) ? ["Rejected"] : [])] : []), "Superseded", "Withdrawn", "Expired"].map((v) => <option key={v}>{v}</option>)}</select></div>
             {sel("vis", "Visibility", L2.VIS)}
             <div className="fld"><label>Dated from</label><input type="date" className="inp" value={L.from} onChange={(e) => set({ from: e.target.value })} /></div>
             <div className="fld"><label>Dated to</label><input type="date" className="inp" value={L.to} onChange={(e) => set({ to: e.target.value })} /></div>

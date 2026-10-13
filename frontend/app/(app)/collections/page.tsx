@@ -23,7 +23,7 @@ export default function CollectionsPage() {
             <div className="stack">{co.docs.slice(0, 4).map((_, i) => <i key={i} />)}</div>
             <b>{co.name}</b><span className="sm muted">{co.desc}</span>
             <div className="row between xs muted" style={{ marginTop: "auto" }}>
-              <span>{plural(co.docs.length, "document")} · {co.owner}</span><span>Updated {fmtD(co.updated)}</span>
+              <span>{plural(co.docs.length, "document")} · {co.ownerName ?? co.owner}</span><span>Updated {fmtD(co.updated)}</span>
             </div>
           </Link>
         ))}
@@ -40,10 +40,10 @@ function NewCollection() {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [docs, setDocs] = useState<string[]>([]);
-  const create = () => {
+  const create = async () => {
     if (!name.trim()) { toast("Name the collection"); return; }
-    const co = { id: nid("C"), name, desc, docs, owner: session?.name ?? "User", updated: todayIso() };
-    void save("collections", co); closeModal(); toast("Collection created"); router.push(`/collections/${co.id}`);
+    const co = { id: nid("C"), name, desc, docs, ownerName: session?.name ?? "User", updated: todayIso() };
+    if (await save("collections", co)) { closeModal(); toast("Collection created"); router.push(`/collections/${co.id}`); }
   };
   return (
     <>

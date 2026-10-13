@@ -26,3 +26,7 @@ Thumbs.db
 # browser tests
 test-results/
 playwright-report/
+
+# keys and certificates — never commit
+*.pem
+*.key

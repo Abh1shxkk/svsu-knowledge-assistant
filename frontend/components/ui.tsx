@@ -74,6 +74,11 @@ export const Field = ({ label, req, hint, error, children, htmlFor }: {
   </div>
 );
 
+/** Buttons at the bottom of a modal form. */
+export const ModalFoot = ({ children }: { children: ReactNode }) => (
+  <div className="mft" style={{ position: "static", borderTop: "1px solid var(--line)", marginTop: 4, paddingTop: 12 }}>{children}</div>
+);
+
 /** Clickable list row (icon · title · meta · trailing). */
 export const Row = ({ href, onClick, lead, title, meta, trail, lang }: {
   href?: string; onClick?: () => void; lead?: ReactNode; title: ReactNode; meta?: ReactNode; trail?: ReactNode; lang?: string;

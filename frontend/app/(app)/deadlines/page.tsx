@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { getDoc, lists, useStore } from "@/lib/store";
-import { daysTo, todayIso } from "@/lib/util";
+import { canUpload, getDoc, lists, useStore } from "@/lib/store";
+import { daysTo, fmtD, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { DateBox, Due } from "@/components/ui";
+import { DeadlineModal, ReminderModal } from "@/components/modals";
 import type { Deadline } from "@/lib/types";
 
 const GROUPS: [string, (x: Deadline) => boolean][] = [
@@ -16,7 +17,8 @@ const GROUPS: [string, (x: Deadline) => boolean][] = [
 
 export default function DeadlinesPage() {
   const s = useStore();
-  const { openViewer, save, toast } = useStore.getState();
+  const { openViewer, openModal, closeModal, save, remove, toast } = useStore.getState();
+  const upl = canUpload(s);
   const [filter, setFilter] = useState<"upcoming" | "overdue" | "done" | "all">("upcoming");
   const [dept, setDept] = useState("");
   const [view, setView] = useState<"list" | "cal">("list");
@@ -28,26 +30,39 @@ export default function DeadlinesPage() {
     : filter === "overdue" ? ds.filter((x) => !x.done && daysTo(x.date) < 0)
       : filter === "done" ? ds.filter((x) => x.done) : ds;
 
-  const toggleDone = (x: Deadline) => { void save("deadlines", { ...x, done: !x.done }); toast(x.done ? "Marked as not done" : "Marked as done"); };
+  const toggleDone = async (x: Deadline) => { if (await save("deadlines", { ...x, done: !x.done })) toast(x.done ? "Marked as not done" : "Marked as done"); };
+  const del = (x: Deadline) => openModal({
+    title: "Delete deadline?", body: <p>Delete <b>{x.title}</b> (due {fmtD(x.date)})? The document is not changed.</p>,
+    foot: <><button className="btn" onClick={closeModal} type="button">Cancel</button>
+      <button className="btn danger" type="button" onClick={async () => { closeModal(); if (await remove("deadlines", x.id)) toast("Deadline deleted"); }}>Delete</button></>,
+  });
   const show = (x: Deadline) => openViewer({ doc: x.doc, page: x.page, block: x.block, quote: x.quote });
 
   const item = (x: Deadline) => {
     const doc = getDoc(s, x.doc);
+    const rem = s.reminders.find((r) => r.deadline === x.id);
     return (
       <div key={x.id} className="li">
         <DateBox date={x.date} />
         <div className="main"><b style={{ whiteSpace: "normal" }}>{x.title}</b>
           <span>{x.owner} · {x.aud} · <button className="link" onClick={() => show(x)} type="button">{doc?.ref}, p.{x.page}</button>
-            {x.conflict && <span style={{ color: "var(--red)" }}> · conflicts with another document</span>}</span></div>
+            {x.conflict && <span style={{ color: "var(--red)" }}> · conflicts with another document</span>}
+            {rem && <> · <Icon n="bell" s /> {rem.days ? `${rem.days} day${rem.days > 1 ? "s" : ""} before` : "on the day"}</>}</span></div>
         <Due date={x.date} done={x.done} />
-        <button className={`btn sm ${x.done ? "" : "ok"}`} onClick={() => toggleDone(x)} type="button">{x.done ? "Undo" : <><Icon n="check" s /> Done</>}</button>
+        {!x.done && <button className={`btn sm ${rem ? "on" : ""}`} aria-label="Set a reminder" title="Remind me" onClick={() => openModal({ title: "Set a reminder", body: <ReminderModal deadline={x} /> })} type="button"><Icon n="bell" s /></button>}
+        {upl && <>
+          <button className={`btn sm ${x.done ? "" : "ok"}`} onClick={() => toggleDone(x)} type="button">{x.done ? "Undo" : <><Icon n="check" s /> Done</>}</button>
+          <button className="iconbtn" aria-label="Edit deadline" onClick={() => openModal({ title: "Edit deadline", body: <DeadlineModal deadline={x} /> })} type="button"><Icon n="edit" s /></button>
+          <button className="iconbtn" aria-label="Delete deadline" onClick={() => del(x)} type="button"><Icon n="trash" s /></button>
+        </>}
       </div>
     );
   };
 
   return (
     <div className="wrap">
-      <div className="pagehead"><div><h2>Actions &amp; Deadlines</h2><p>Dates and required actions extracted from documents. Each item links to the passage it came from.</p></div></div>
+      <div className="pagehead"><div><h2>Actions &amp; Deadlines</h2><p>Dates and required actions extracted from documents. Each item links to the passage it came from.</p></div>
+        {upl && <button className="btn pri" onClick={() => openModal({ title: "Add a deadline", body: <DeadlineModal /> })} type="button"><Icon n="plus" s /> Add deadline</button>}</div>
       <div className="row between">
         <div className="row">
           <div className="seg">{([["upcoming", "Upcoming"], ["overdue", "Overdue"], ["done", "Completed"], ["all", "All"]] as const).map(([k, l]) => (

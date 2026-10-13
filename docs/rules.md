@@ -8,19 +8,19 @@
 ## 1. Security & secrets (top priority)
 
 1. **No secret ever committed.** No API keys, DB passwords, connection strings, or tokens in
-   source, config, fixtures, or docs. This includes the MSSQL password and the OpenAI key.
-   - *Context:* this project has already had an OpenAI key leaked via a committed `.env` in a
-     related repo, and the DB password was shared in plaintext chat. Treat both as compromised
-     until rotated.
+   source, config, fixtures, or docs — and no internal server addresses, user names or database
+   names either. This includes the OpenAI key and the database URL.
+   - *Context:* an OpenAI key and EMS credentials were once shared in plaintext chat, and EMS server
+     details were committed to this repo's history. Treat anything exposed as compromised until rotated.
 2. **All secrets come from `.env`** (git-ignored) loaded via `pydantic-settings`. Commit a
    `.env.example` with **empty** values and comments only.
 3. **`.gitignore` includes `.env` from commit #1.** Verify before the first push.
-4. **Never pass passwords on a command line.** Use env vars (e.g. `SQLCMDPASSWORD`) — command
-   lines land in shell history and process lists.
+4. **Never pass passwords on a command line.** Use env vars or hidden prompts (as
+   `python -m app.cli create-admin` does) — command lines land in shell history and process lists.
 5. **Rotate on exposure.** If a secret is ever printed, logged, or committed, rotate it, don't
    just delete the line — git history and logs keep it.
-6. **Least privilege on the DB.** The app's SQL login should be read-only where it only reads
-   EMS data; write access limited to the app's own tables/schema.
+6. **Least privilege on the DB.** In production the app's database user owns only this app's
+   database; no superuser.
 7. **Never send secrets to third parties.** Don't put the user's email, DB creds, or internal
    data into request headers/URLs/payloads to unrelated services.
 
@@ -55,44 +55,48 @@
 
 ## 4. Access control & roles
 
-1. **Enforce authorization server-side, always.** The frontend hides things for UX; the API must
-   independently deny. Never trust a client-supplied role.
-2. Roles: `admin` (full) and `viewer` (restricted). Viewers cannot see restricted docs, pending
-   docs, or admin/upload/review/reports modules.
-3. Every document-returning endpoint (library, ask, viewer, collections, deadlines) applies the
-   same permission filter.
-4. Auth via JWT with short-lived access tokens; verify on every request.
+1. **Enforce authorization server-side, always.** `backend/app/policy.py` is the single place that
+   decides who may see or change what; every endpoint goes through it. The frontend only hides
+   buttons the server would refuse. Never trust a client-supplied role or owner.
+2. Roles: **Administrator, Approver, Uploader, Viewer** (see instructions.md §2). Document access
+   levels (Public, All Staff, Department only, Management Only) are mapped to roles by the matrix in
+   Administration → Access levels, and the server enforces it.
+3. Every response is filtered: documents, deadlines, collections, bookmarks, search, `/ask`
+   retrieval and exports only ever include documents the person may open.
+4. Chats, bookmarks, reminders and preferences are private to their owner; the server records the
+   owner, not the browser.
+5. Nobody can remove their own administrator access, and there is always one active administrator.
+6. Every rule change gets a test in `tests/test_policy.py` or `tests/test_api.py`.
 
 ---
 
 ## 5. Document lifecycle
 
-1. A document is **Draft → Pending → Published** (or **Rejected**). Only **Published** docs are
-   visible in the library and usable in answers.
-2. Publishing is an explicit approver action and is **audit-logged** (who, when).
-3. Superseded documents are marked, not silently deleted; history is preserved.
-4. Re-uploading a duplicate is detected and flagged, not silently indexed twice.
+1. **Draft → Pending → Active** (or **Changes requested → Pending**, or **Rejected**). Later:
+   **Superseded** (a revision was approved), **Withdrawn**, **Expired**. Only Active, Superseded and
+   Expired documents are used in answers; Superseded and Expired only as history.
+2. Uploaders work only on their own Draft, Pending or Changes-requested documents and can only
+   save or submit them. Publishing, rejecting and withdrawing are approver actions.
+3. Every change is **audit-logged by the server** (who, what, when). The browser cannot write the log.
+4. Documents are replaced by revisions, not edited in place, once published.
+5. Uploads that repeat an existing document (same text or reference number) are flagged.
 
 ---
 
-## 6. Database rules (MSSQL)
+## 6. Database rules (PostgreSQL)
 
-1. It is **Microsoft SQL Server (port 1433)**, not MySQL. Use `mssql+pyodbc`/`pymssql`, not a
-   MySQL driver.
-2. **Never run destructive SQL against the EMS DB.** Reads only, unless the table is explicitly
-   owned by this app. No `DROP`/`TRUNCATE`/schema changes on shared tables.
-3. All queries parameterized — **no string-concatenated SQL** (injection + correctness).
-4. Map the real schema before coding ingestion; don't assume column names.
-5. Connections are pooled and time-bounded; handle the DB being unreachable gracefully (it has
-   already timed out from outside the network — build for allowlist/VPN realities).
+1. One PostgreSQL 16 database with the `vector` extension holds everything.
+2. All queries go through SQLAlchemy — **no string-built SQL**.
+3. Tests use their own database (`svsu_test`) and must never touch the real one.
+4. Back up daily (`python -m app.cli backup`) and test a restore before going live.
 
 ---
 
 ## 7. Code quality
 
 1. **Match the surrounding code** — naming, structure, comment density, idiom.
-2. Backend: type hints + Pydantic models at the boundaries; services layer (`app/services/*`) does
-   the work, routers stay thin (mirror the existing GenAI repo layout).
+2. Backend: type hints and Pydantic models at the boundaries; endpoints in `main.py` stay thin and
+   call the modules (`policy`, `rag`, `extract`, `store`, …). No extra layers until they're needed.
 3. Frontend: TypeScript strict; no `any` without a written reason; components small and composed.
 4. **No secrets, tokens, or real data in tests or fixtures.** Use synthetic data.
 5. Handle errors explicitly; fail loudly in dev, gracefully in prod. No silent `except: pass`.

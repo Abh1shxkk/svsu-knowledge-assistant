@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { getDoc, useStore } from "@/lib/store";
+import { chatGroup, getDoc, useStore } from "@/lib/store";
 import { plural } from "@/lib/util";
 import { Icon } from "@/components/icon";
-import { Tabs } from "@/components/ui";
+import { Field, ModalFoot, Tabs } from "@/components/ui";
 import { answerText } from "@/components/answer";
-import type { Msg } from "@/lib/types";
+import type { Chat, Msg } from "@/lib/types";
 
 export default function SavedPage() {
   const s = useStore();
-  const { remove, openViewer, toast } = useStore.getState();
+  const { remove, save, openViewer, openModal, toast } = useStore.getState();
   const [tab, setTab] = useState("chats");
   const saved = s.chats.filter((c) => c.saved);
 
@@ -23,9 +23,10 @@ export default function SavedPage() {
       {tab === "chats" && (saved.length ? (
         <div className="card">{saved.map((c) => (
           <div key={c.id} className="li"><span className="av" style={{ width: 30, height: 30 }}><Icon n="chat" s /></span>
-            <div className="main"><b>{c.savedName || c.title}</b><span>{plural(Math.ceil(c.msgs.length / 2), "question")} · {c.when} · first: {(c.msgs[0] as { text: string }).text}</span></div>
+            <div className="main"><b>{c.savedName || c.title}</b><span>{plural(Math.ceil(c.msgs.length / 2), "question")} · {chatGroup(c)} · first: {(c.msgs[0] as { text: string }).text}</span></div>
             <Link className="btn sm" href={`/ask?c=${c.id}`}>Open</Link>
-            <button className="iconbtn" aria-label="Remove from saved" onClick={() => { void useStore.getState().save("chats", { ...c, saved: false }); toast("Removed from saved"); }} type="button"><Icon n="trash" s /></button>
+            <button className="iconbtn" aria-label="Rename conversation" onClick={() => openModal({ title: "Rename conversation", body: <RenameChat chat={c} /> })} type="button"><Icon n="edit" s /></button>
+            <button className="iconbtn" aria-label="Remove from saved" onClick={async () => { if (await save("chats", { ...c, saved: false })) toast("Removed from saved"); }} type="button"><Icon n="trash" s /></button>
           </div>
         ))}</div>
       ) : <div className="card empty">No saved conversations. Use “Save” in a conversation to keep it here.</div>)}
@@ -40,7 +41,7 @@ export default function SavedPage() {
               <div className="main"><b>{b.q}</b><span style={{ display: "block", whiteSpace: "normal" }}>{preview}…</span>
                 <span>{m?.answer?.cites.length ?? 0} sources · bookmarked {b.when}</span></div>
               {chat && <Link className="btn sm" href={`/ask?c=${chat.id}`}>Open</Link>}
-              <button className="iconbtn" aria-label="Remove bookmark" onClick={() => { void remove("bm_answers", b.id); toast("Bookmark removed"); }} type="button"><Icon n="trash" s /></button>
+              <button className="iconbtn" aria-label="Remove bookmark" onClick={async () => { if (await remove("bm_answers", b.id)) toast("Bookmark removed"); }} type="button"><Icon n="trash" s /></button>
             </div>
           );
         })}</div>
@@ -54,11 +55,26 @@ export default function SavedPage() {
               <div className="main"><b style={{ whiteSpace: "normal", fontFamily: "var(--f-doc)", fontWeight: 400 }} lang={d?.lang}>“{b.quote}”</b>
                 <span>{d?.title} · {d?.ref}, p.{b.page}{b.note && " · Note: " + b.note}</span></div>
               <button className="btn sm" onClick={() => openViewer({ doc: b.doc, page: b.page, block: b.block, quote: b.quote })} type="button">Show passage</button>
-              <button className="iconbtn" aria-label="Remove bookmark" onClick={() => { void remove("bm_passages", b.id); toast("Bookmark removed"); }} type="button"><Icon n="trash" s /></button>
+              <button className="iconbtn" aria-label="Remove bookmark" onClick={async () => { if (await remove("bm_passages", b.id)) toast("Bookmark removed"); }} type="button"><Icon n="trash" s /></button>
             </div>
           );
         })}</div>
       ) : <div className="card empty">No bookmarked passages. Open a citation and choose “Bookmark passage”.</div>)}
     </div>
+  );
+}
+
+function RenameChat({ chat }: { chat: Chat }) {
+  const { save, closeModal, toast } = useStore.getState();
+  const [name, setName] = useState(chat.savedName || chat.title);
+  const submit = async () => {
+    if (!name.trim()) return;
+    if (await save("chats", { ...chat, title: name.trim(), savedName: name.trim() })) { closeModal(); toast("Renamed"); }
+  };
+  return (
+    <>
+      <Field label="Name" htmlFor="rc-n"><input className="inp" id="rc-n" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></Field>
+      <ModalFoot><button className="btn" onClick={closeModal} type="button">Cancel</button><button className="btn pri" onClick={submit} type="button">Rename</button></ModalFoot>
+    </>
   );
 }

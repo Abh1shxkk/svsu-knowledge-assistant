@@ -1,45 +1,62 @@
 # Fix plan — from the October 2026 project scan
 
-Everything the deep scan found, in the order it is being fixed. Each phase is committed on its own.
-Longer-term work (real tables, background jobs, deployment) stays in [PLAN.md](PLAN.md).
+Everything the deep scan found, and how each item was fixed. Longer-term work (real tables,
+background jobs, deployment) stays in [PLAN.md](PLAN.md).
 
-## Phase 1 — Security (first)
-| # | Fix | How |
+## Phase 1 — Security
+| # | Fix | Status |
 |---|---|---|
-| 1.1 | EMS server address, DB user and DB name in `docs/instructions.md` and public git history | Remove from the doc; rewrite history with `git filter-repo --replace-text`; force-push. Backup mirror kept on D: |
-| 1.2 | Uploader can change text/visibility of a published document | `policy.write_error`: non-approvers may only edit their own unpublished documents. Tests added |
-| 1.3 | Admin can demote, deactivate or delete themselves (lockout) | Server refuses changes to your own role/active flag, and removing the last active Administrator |
-| 1.4 | Default sign-in secret, CORS `*` | Server refuses to start with the default `JWT_SECRET` unless the test admin (dev mode) is on; CORS origins from `CORS_ORIGINS` |
-| 1.5 | Test admin login, OpenAI key | Owner action: create the real admin, clear `DEV_ADMIN_*`, rotate the OpenAI key |
+| 1.1 | EMS server address, DB user and DB name in `docs/instructions.md` and the public git history | Removed from the doc. **History rewrite needs the owner** — see below |
+| 1.2 | Uploader could change the text or access of a published document | Fixed in `policy.write_error`: uploaders only edit their own Draft/Pending/Changes-requested documents. Tested |
+| 1.3 | Admin could demote, deactivate or delete themselves | Server refuses it, and keeps at least one active administrator. Tested |
+| 1.4 | Weak sign-in secret, CORS open to every site | New 64-character `JWT_SECRET`; the API refuses to start with the default secret outside dev mode; CORS limited to `CORS_ORIGINS` |
+| 1.5 | Viewers could overwrite anyone's feedback or unanswered-question records | Only approvers manage them; feedback has an owner; unanswered questions are logged by the server |
+| 1.6 | Test admin login, OpenAI key | **Owner action** — see TODO.md |
 
-## Phase 2 — "Looks saved but isn't" and other bugs
-| # | Fix |
-|---|---|
-| 2.1 | `save`/`remove` in the browser roll back and show the server's reason when the server refuses |
-| 2.2 | Buttons the server would refuse are hidden for that role (deadline Done, Withdraw/Restore, collection rename/delete) |
-| 2.3 | Upload accepts only what the server can read (no `.doc`/`.xls`) |
-| 2.4 | Uploaders: see their own pending documents in Library, resubmit after "Changes requested", no dead "Review queue" link |
-| 2.5 | No "SAMPLE" watermark or fake signature on real uploads |
-| 2.6 | Deleting a document also deletes its deadlines and bookmarks and removes it from collections |
-| 2.7 | AI settings take effect: max sources, default language, history-only rule, log unanswered, show confidence |
-| 2.8 | One feedback entry per answer; chat dates from a timestamp; correct "answers this month" |
+**Scrubbing the history (run once, from the project folder).** A backup of the repo is in
+`D:/backups/svsu-before-scrub.git`.
+First create `../replace.txt` **outside the repo** with three lines, `<value>==>[removed]`, one each
+for the old EMS server address, database user and database name (never commit this file). Then:
+```bash
+backend/.venv/Scripts/python -m git_filter_repo --replace-text ../replace.txt --force
+git remote add origin https://github.com/Abh1shxkk/svsu-knowledge-assistant.git
+git push --force origin main
+```
+GitHub may keep old commits reachable by their id for a while. Ask GitHub Support to purge cached
+views, or make the repository private.
 
-## Phase 3 — Speed
-| # | Fix |
-|---|---|
-| 3.1 | Read only the record kinds a request needs (not the whole database) |
-| 3.2 | Library and dashboards get documents without their full text; text loads when a document is opened |
-| 3.3 | Upload processing runs off the main thread, so other people aren't blocked |
-| 3.4 | Embeddings are sent in batches, so large documents save |
+## Phase 2 — "Looks saved but isn't" and other bugs — done
+- The browser rolls a change back and shows the server's reason when a save or delete is refused.
+- Buttons are shown only to roles the server allows (deadline Done, Withdraw/Restore, Edit,
+  collection rename/delete, Review queue links).
+- Upload accepts only what the server reads (no `.doc`/`.xls`; the message says to convert them).
+- Uploaders see their own drafts and pending documents in the Library, and can resubmit after
+  "Changes requested".
+- No "SAMPLE" watermark or "sd/-" signature on real uploads.
+- Deleting a document removes its deadlines, bookmarks, conflicts and links, and takes it out of collections.
+- AI settings take effect: passages per answer, default language, history-only rule, logging of
+  unanswered questions, showing the evidence label.
+- One feedback entry per answer; chats grouped by real dates; "Questions this month" counts everyone's
+  questions from a server-side usage log.
 
-## Phase 4 — Missing prototype features
-Ask: export, report conflict, compare documents, request a document, feedback reason ·
-Document: link documents, add revision, add deadline, edit tags · Upload: duplicate check, save draft,
-link to older version · Review: checklist, real automatic checks · Deadlines: add/edit/delete,
-reminders · Reports: weekly chart, copy CSV, assign · Admin: rename tags, edit/delete users ·
-Notifications bell · Viewer page buttons.
+## Phase 3 — Speed — done
+- Requests read only the record kinds they need.
+- Lists leave out document text; it loads when a document is opened. Library text search runs on the server.
+- Upload processing runs on a worker thread, so other people aren't blocked.
+- Embeddings are sent in batches of 256, so long documents save.
 
-## Phase 5 — Tests, tooling, docs
-API tests (pytest + test database) · Playwright browser tests · GitHub Actions CI · pinned
-dependency versions · database backup script · rewrite `instructions.md`, `design.md`, `rules.md`.
+## Phase 4 — Prototype features — done
+Ask: export answer or conversation (Word, print/PDF, copy), compare documents, report conflict,
+request a document, "what was wrong" feedback · Document: link documents, add revision, add/remove
+tags, add deadline, submit draft · Upload: duplicate check, save draft, revision and related
+documents · Review: reviewer checklist, real automatic checks (missing fields, duplicate reference,
+near-identical active document, empty pages, low OCR confidence, dates) · Deadlines: add, edit,
+delete, personal reminders (in-app, email when SMTP is set) · Reports: questions per week, copy as
+CSV, assign, request document, compare · Admin: rename tags, edit and delete users, passages per
+answer · Notifications bell · Viewer page buttons · Rename conversation.
+
+## Phase 5 — Tests, tooling, docs — done
+10 API tests on a separate test database (plus 25 policy tests) · 3 Playwright browser journeys ·
+GitHub Actions CI · pinned Python versions (npm is pinned by `package-lock.json`) ·
+`python -m app.cli backup` · `instructions.md`, `design.md` and `rules.md` rewritten.
 Migrations (Alembic) come with the move to real tables (PLAN.md 0.1).

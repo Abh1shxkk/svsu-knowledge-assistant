@@ -1,11 +1,11 @@
 """The app's data in PostgreSQL: JSON records grouped by kind, plus password hashes."""
-from sqlalchemy import Column, Integer, String, Table, UniqueConstraint, select
+from sqlalchemy import Column, Integer, String, Table, UniqueConstraint, case, cast, select, Text
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from .database import engine, meta
 
 KINDS = {"documents", "collections", "deadlines", "chats", "bm_answers", "bm_passages", "feedback",
-         "unanswered", "conflicts", "users", "audit", "settings"}
+         "unanswered", "conflicts", "users", "audit", "settings", "reminders", "prefs", "questions"}
 
 records = Table(
     "records", meta,
@@ -15,7 +15,7 @@ records = Table(
     Column("data", JSONB, nullable=False),
     UniqueConstraint("kind", "id"),
 )
-# Password hashes live in their own table and are NEVER returned by all_records().
+# Password hashes live in their own table and are NEVER returned by records_of().
 credentials = Table(
     "credentials", meta,
     Column("login_id", String(64), primary_key=True),
@@ -24,12 +24,31 @@ credentials = Table(
 meta.create_all(engine, tables=[records, credentials])
 
 
-def all_records() -> dict[str, list[dict]]:
-    out: dict[str, list[dict]] = {k: [] for k in KINDS}
+# Lists leave out each document's full text ("pages"); get() returns it, one document at a time.
+_light = case((records.c.kind == "documents", records.c.data.op("-", return_type=JSONB)("pages")), else_=records.c.data)
+
+
+def records_of(*kinds: str) -> dict[str, list[dict]]:
+    """The given kinds (all of them if none are named), newest first, documents without their text."""
+    kinds = kinds or tuple(KINDS)
+    out: dict[str, list[dict]] = {k: [] for k in kinds}
+    q = select(records.c.kind, _light).where(records.c.kind.in_(kinds)).order_by(records.c.seq.desc())
     with engine.connect() as c:
-        for kind, data in c.execute(select(records.c.kind, records.c.data).order_by(records.c.seq.desc())):
+        for kind, data in c.execute(q):
             out[kind].append(data)
     return out
+
+
+def list_of(kind: str) -> list[dict]:
+    return records_of(kind)[kind]
+
+
+def search_documents(text: str) -> list[dict]:
+    """Documents whose details or text contain `text` (any case), without their text."""
+    like = "%" + text.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
+    q = select(_light).where(records.c.kind == "documents", cast(records.c.data, Text).ilike(like))
+    with engine.connect() as c:
+        return list(c.scalars(q))
 
 
 def get(kind: str, id: str) -> dict | None:

@@ -98,6 +98,30 @@ def test_uploader_submits_new_and_resubmits_own():
     assert write_error(user("Uploader"), "documents", {**theirs, "status": "Pending"}, theirs, CTX)
 
 
+def test_uploader_cannot_edit_published_or_others_documents():
+    up = user("Uploader")
+    for status in ("Active", "Superseded", "Withdrawn", "Rejected"):
+        live = doc(status=status, uploader_id="u1")  # even their own, once published
+        assert write_error(up, "documents", {**live, "pages": [[{"id": "b1", "text": "new"}]]}, live, CTX)
+        assert write_error(up, "documents", {**live, "visibility": "Management Only"}, live, CTX)
+    pending = doc(status="Pending", uploader_id="other")
+    assert write_error(up, "documents", {**pending, "title": "x"}, pending, CTX)
+    draft = doc(status="Draft", uploader_id="u1")
+    assert write_error(up, "documents", {**draft, "title": "x"}, draft, CTX) is None
+    assert write_error(up, "documents", doc(status="Draft"), None, CTX) is None
+
+
+def test_feedback_conflicts_unanswered():
+    v = user("Viewer")
+    fb = {"id": "f", "owner": "u1"}
+    assert write_error(v, "feedback", {**fb, "rating": "down"}, fb, CTX) is None   # change own rating
+    assert write_error(v, "feedback", {"id": "f"}, {"id": "f", "owner": "u2"}, CTX)  # not someone else's
+    assert write_error(v, "conflicts", {"id": "c"}, None, CTX) is None              # report one
+    assert write_error(v, "conflicts", {"id": "c", "status": "Resolved"}, {"id": "c"}, CTX)
+    assert write_error(v, "unanswered", {"id": "q"}, None, CTX)                    # server logs these
+    assert write_error(user("Approver"), "unanswered", {"id": "q"}, {"id": "q"}, CTX) is None
+
+
 def test_viewer_writes():
     v = user("Viewer")
     assert write_error(v, "documents", doc(status="Pending"), None, CTX)

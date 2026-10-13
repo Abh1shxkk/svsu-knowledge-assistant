@@ -2,8 +2,10 @@
 
 export const todayIso = () => new Date().toLocaleDateString("en-CA"); // local date as YYYY-MM-DD
 
+/** "13 Oct 2026" from an ISO date; anything else (older records) is shown as written. */
 export const fmtD = (d?: string) =>
-  d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  !d ? "—" : /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : d;
 
 export const daysTo = (d: string) =>
   Math.round((new Date(d + "T00:00:00").getTime() - new Date(todayIso() + "T00:00:00").getTime()) / 864e5);

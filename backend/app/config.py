@@ -1,6 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+DEFAULT_SECRET = "change-me-in-production"
+
+
 class Settings(BaseSettings):
     openai_api_key: str = ""
     chat_model: str = "gpt-4o"
@@ -22,8 +25,16 @@ class Settings(BaseSettings):
     # Load the prototype's sample documents into an empty database (development only).
     demo_data: bool = False
 
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = DEFAULT_SECRET
     token_hours: int = 12
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"  # the web app's address(es), comma-separated
+
+    # Deadline reminder emails. Leave SMTP_HOST blank to show reminders in the app only.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    smtp_from: str = ""
     # Local test admin (dev only). Leave blank in production.
     dev_admin_user: str = ""
     dev_admin_pass: str = ""
@@ -32,3 +43,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+if settings.jwt_secret == DEFAULT_SECRET and not settings.dev_admin_user:
+    raise SystemExit("Set JWT_SECRET in backend/.env to a long random value before running in production.")

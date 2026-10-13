@@ -1,4 +1,4 @@
-import type { Answer, Deadline, FileKind, Block, Kind, Records } from "./types";
+import type { Answer, Deadline, Doc, FileKind, Block, Kind, Notice, Records } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const TOKEN_KEY = "svsu_token";
@@ -25,11 +25,16 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (typeof window !== "undefined" && location.pathname !== "/login") location.href = "/login";
   }
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.detail ?? `Request failed (${res.status})`);
-  return res.json();
+  return (res.headers.get("content-type")?.includes("json") ? res.json() : res.blob()) as Promise<T>;
 }
 const jsonBody = (method: string, body: unknown): RequestInit => ({
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
+
+export type Extracted = {
+  kind: FileKind; pages: Block[][]; ocr: number | null; ocr_engine: string | null; suggestion: Record<string, unknown>;
+  duplicate: { id: string; title: string; ref: string; status: string } | null;
+};
 
 export type SessionUser = { login_id: string; name: string; email: string; role: string; dept?: string; dev?: boolean; employee_id?: number };
 
@@ -45,8 +50,16 @@ export const api = {
   extract: (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    return call<{ kind: FileKind; pages: Block[][]; ocr: number | null; ocr_engine: string | null; suggestion: Record<string, unknown> }>("/extract", { method: "POST", body: fd });
+    return call<Extracted>("/extract", { method: "POST", body: fd });
   },
+  document: (id: string) => call<Doc>(`/documents/${encodeURIComponent(id)}`),
+  search: (q: string) => call<string[]>(`/search?q=${encodeURIComponent(q)}`),
+  checks: (id: string) => call<[string, string][]>(`/documents/${encodeURIComponent(id)}/checks`),
+  notifications: () => call<Notice[]>("/notifications"),
+  reportSummary: () => call<{ month: number; cited: number; weeks: { label: string; value: number }[] }>("/reports/summary"),
+  requestDoc: (q: string, dept: string, note: string) => call<{ ok: boolean }>("/unanswered/request", jsonBody("POST", { q, dept, note })),
+  renameTag: (old: string, next: string) => call<{ ok: boolean }>("/admin/tags/rename", jsonBody("POST", { old, new: next })),
+  exportDocx: (title: string, items: { q: string; answer: Answer }[]) => call<Blob>("/export/docx", jsonBody("POST", { title, items })),
   deadlines: (docId: string) => call<Omit<Deadline, "id" | "dept">[]>(`/documents/${docId}/deadlines`, { method: "POST" }),
   createAccount: (a: { login_id: string; name: string; email: string; dept: string; role: string; password: string }) =>
     call<{ ok: boolean }>("/accounts", jsonBody("POST", a)),

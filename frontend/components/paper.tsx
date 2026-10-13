@@ -69,12 +69,14 @@ function Sheet({ page, hl }: { page: Block[]; hl: Highlight }) {
   );
 }
 
-export function Pages({ doc, hl = null, onBookmark, zoom }: {
-  doc: Doc; hl?: Highlight; onBookmark?: (page: number, block: string) => void; zoom?: number;
+export function Pages({ doc, hl = null, onBookmark, zoom, only }: {
+  doc: Doc; hl?: Highlight; onBookmark?: (page: number, block: string) => void; zoom?: number; only?: number;
 }) {
+  if (!doc.pages) return <div className="empty"><span className="spin" /></div>;
+  const pages = doc.pages;
   return (
     <>
-      {doc.pages.map((page, pi) => (
+      {pages.map((page, pi) => (only !== undefined && pi !== only) ? null : (
         <div key={pi} className={`paper ${doc.fileType === "scan" ? "scan" : ""}`} data-page={pi + 1} lang={doc.lang}
           style={zoom ? { zoom } : undefined}>
           {doc.fileType === "scan" && <span className="ocrbadge">Scanned · OCR text {doc.ocr}% confidence</span>}
@@ -82,14 +84,15 @@ export function Pages({ doc, hl = null, onBookmark, zoom }: {
           {doc.fileType === "xlsx"
             ? <Sheet page={page} hl={hl} />
             : page.map((b) => <BlockP key={b.id} b={b} page={pi + 1} hl={hl} onBookmark={onBookmark} />)}
-          {pi === doc.pages.length - 1 && doc.fileType !== "xlsx" && (
+          {/* The prototype's sample letters carry a signature block and a watermark; real uploads don't. */}
+          {doc.sample && pi === pages.length - 1 && doc.fileType !== "xlsx" && (
             <div className="sign">
               <div className="scrib">sd/-</div><div><b>{doc.authority}</b></div>
               <div className="cc">Copy to: All Heads of Institutions · Notice boards · University ERP</div>
             </div>
           )}
-          <div className="pfoot"><span>{doc.ref}</span><span>Page {pi + 1} of {doc.pages.length}</span></div>
-          <div className="wm">SAMPLE</div>
+          <div className="pfoot"><span>{doc.ref}</span><span>Page {pi + 1} of {pages.length}</span></div>
+          {doc.sample && <div className="wm">SAMPLE</div>}
         </div>
       ))}
     </>
@@ -97,4 +100,4 @@ export function Pages({ doc, hl = null, onBookmark, zoom }: {
 }
 
 export const docText = (d: Doc) =>
-  d.pages.map((pg, i) => `— Page ${i + 1} —\n` + pg.map((b) => (Array.isArray(b.text) ? b.text.join("\t") : b.text)).join("\n\n")).join("\n\n");
+  (d.pages ?? []).map((pg, i) => `— Page ${i + 1} —\n` + pg.map((b) => (Array.isArray(b.text) ? b.text.join("\t") : b.text)).join("\n\n")).join("\n\n");

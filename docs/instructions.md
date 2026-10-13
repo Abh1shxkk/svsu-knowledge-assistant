@@ -1,135 +1,90 @@
 # SVSU Knowledge Assistant — Build Instructions
 
-> **What this is:** A role-based **RAG** (Retrieval-Augmented Generation) system for official
-> university records. Staff upload documents (letters, notices, circulars, policies); an AI model
-> indexes them and answers questions **grounded in those documents**, always citing the exact
-> source page/passage. It never answers from general knowledge — only from the ingested data.
-
-Audience: the engineers building this project.
+> Audience: developers working on this project. What the product is, how it is built, and how to
+> run it. Remaining work is in [PLAN.md](PLAN.md) and [../TODO.md](../TODO.md).
 
 ---
 
 ## 1. Product in one paragraph
 
-Subharti University (SVSU) staff need to find answers buried across thousands of official
-documents. Today that means manually digging through PDFs. This app ingests those documents,
-makes them searchable in plain language (English + Hindi), and lets a user ask a question and get
-a **cited, document-grounded answer** — with the original passage shown side-by-side. Access is
-controlled by role: administrators see everything; viewers only see what they are permitted to.
+Staff of Swami Vivekanand Subharti University ask questions about official letters, notices,
+circulars and policies, in Hindi or English, and get answers **only from the university's own
+documents**, with every claim cited to the exact passage. Documents are uploaded, read once (OCR
+for scans), checked by an approver and only then used in answers. Who can open a document, and so
+who the assistant may answer from, is decided by role, department and the document's access level.
 
----
+## 2. Modules (names and order from the prototype)
 
-## 2. Core modules (functionality carried over from the prototype)
+Dashboard · Ask AI · Document Library · Upload Documents · Review & Approvals · Collections ·
+Actions & Deadlines · Saved Chats & Bookmarks · Reports & Feedback · Administration, plus My profile.
 
-The HTML prototype (`svsu-assistant.html`) is the **functional spec**. We take its *modules and
-behavior*, not its UI. Build these:
+| Role | Can do |
+|---|---|
+| Viewer | Ask, read permitted documents, collections, bookmarks, deadline reminders |
+| Uploader | + upload, save drafts, edit and resubmit **their own unpublished** documents, add deadlines |
+| Approver | + review, publish, reject, withdraw, link documents, reports |
+| Administrator | + users, roles, access levels, tags, departments, AI settings, audit log, delete documents |
 
-| # | Module | What it does |
-|---|--------|--------------|
-| 1 | **Ask (AI chat)** | Natural-language Q&A grounded in documents. Every answer cites source doc + page + passage. Can scope a question to one file or a Collection. Multi-turn chat history. |
-| 2 | **Document Library** | Browse/search all permitted documents. Filters (subject, dept, audience, type, status, visibility, date). List + card/grid views. Opens a paginated **document viewer**. |
-| 3 | **Document Viewer** | Paginated view of the source document with a letterhead, selectable text blocks, highlight of the cited passage, and "bookmark passage" / "ask about this document". |
-| 4 | **Upload pipeline** | Add files → extract text (OCR for scans) → auto-classify (type/subject) → auto-tag → chunk → embed → index. Shows a live processing queue. Duplicate detection. |
-| 5 | **Review & Approvals** | A document is **not searchable or visible in the library until an approver publishes it.** Draft → pending → published/rejected workflow. |
-| 6 | **Collections** | Group documents for a team/task, then ask questions scoped to just that group. |
-| 7 | **Actions & Deadlines** | Auto-extract dates and required actions from documents; each item links back to the source passage. |
-| 8 | **Saved Chats & Bookmarks** | Keep conversations, answers, and document passages for later. |
-| 9 | **Reports & Feedback** | Usage figures over time; questions/feedback that need follow-up. |
-| 10 | **Administration** | Manage people, roles/access, the tag vocabulary, and answer settings. |
-| 11 | **Roles & permissions** | `admin` (e.g. Deputy Registrar) vs `viewer` (e.g. HOD). Restricted docs, pending docs, and admin modules are hidden from viewers. |
-| 12 | **Multilingual** | English + Hindi (Devanagari). Must handle Hindi in documents, questions, and answers. |
+## 3. How answering works
 
----
+1. **Text is extracted once**, at upload (PyMuPDF, python-docx, openpyxl; Tesseract OCR for scans
+   and photos, Hindi + English). Each paragraph is embedded and stored in PostgreSQL with pgvector.
+2. **The LLM rewrites the question** into 2–3 search queries (English and Hindi, abbreviations
+   expanded, follow-ups completed from the chat). It does not search.
+3. **Semantic search** (pgvector, cosine) finds the paragraphs, only within documents the person may
+   see and has in scope, at most 3 per document.
+4. **The LLM answers from those paragraphs only** and cites each claim. If nothing matches, it says
+   so; the question is logged for Reports.
 
-## 3. Architecture (high level)
+## 4. Architecture
 
 ```
-┌────────────┐     ┌──────────────────────── Backend (FastAPI) ───────────────────────┐
-│  Frontend  │     │                                                                   │
-│ Next.js +  │────▶│  /auth   /documents   /ask   /upload   /collections   /admin ...  │
-│ Tailwind   │ API │     │          │         │        │                               │
-│ (Apple UI) │◀────│     ▼          ▼         ▼        ▼                               │
-└────────────┘     │  Auth/RBAC  Ingestion  RAG      OCR + classify + tag              │
-                   │              pipeline  engine                                     │
-                   └──────┬──────────────┬────────────────┬────────────────────────────┘
-                          │              │                │
-                   ┌──────▼─────┐  ┌─────▼──────┐   ┌──────▼──────┐
-                   │  MSSQL     │  │  Qdrant    │   │  OpenAI     │
-                   │ (metadata, │  │ (vector    │   │ (embeddings │
-                   │  users,    │  │  index /   │   │  + GPT-4o   │
-                   │  app data, │  │  chunks)   │   │  answers)   │
-                   │  EMS src)  │  └────────────┘   └─────────────┘
-                   └────────────┘
+Browser (Next.js 16, React 19, Zustand)
+   │  JWT bearer token · lists without document text · text loaded per document
+   ▼
+API (FastAPI, Python 3.11)          app/main.py — endpoints
+   ├─ policy.py   who may see / change what (the only place access is decided; unit-tested)
+   ├─ rag.py      embeddings, search, answers        ├─ extract.py  file reading, suggestions
+   ├─ ocr.py      Tesseract                          ├─ notices.py  notifications, reminder emails
+   ├─ auth.py     accounts (bcrypt), tokens          ├─ export.py   Word export
+   └─ store.py    records in PostgreSQL (JSONB)
+   ▼
+PostgreSQL 16 + pgvector — one database: records, credentials, blocks (embeddings)
+OpenAI — gpt-4o (answers), gpt-4o-mini (query rewriting), text-embedding-3-small
 ```
 
-**The RAG flow (the heart of the app):**
-1. User asks a question (optionally scoped to a file/collection).
-2. Embed the question (OpenAI `text-embedding-3-large`).
-3. Vector search in Qdrant → top-K relevant chunks **the user is permitted to see**.
-4. Build a prompt: system instructions + retrieved chunks + question.
-5. GPT-4o generates an answer **using only the retrieved chunks**, with inline citations.
-6. Return the answer + the source passages (doc id, page, chunk) so the UI can show/highlight them.
-7. If nothing relevant is retrieved → say "I couldn't find this in the documents," never invent.
+## 5. Running it locally
 
----
+```bash
+# backend (needs Tesseract 5 with eng, hin and osd language files)
+cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
+cp .env.example .env          # fill in OPENAI_API_KEY and JWT_SECRET
+.venv/Scripts/python -m app.cli create-admin --login-id <id> --name "<name>"
+.venv/Scripts/python -m uvicorn app.main:app --port 8000
 
-## 4. Recommended tech stack
+# frontend
+cd frontend && npm ci && npx next dev --port 3000
+```
+With `DATABASE_URL` blank, a local PostgreSQL (pgserver) starts with its data in `PG_DATA_DIR`.
 
-Chosen to (a) reuse what already works in the `GenAI` repo, (b) match the existing **MSSQL** EMS
-database, and (c) support the premium frontend.
+## 6. Tests
 
-### Backend
-- **Language/framework:** Python 3.11 + **FastAPI** (same shape as the GenAI repo: `app/services/*`).
-- **RAG/orchestration:** LangChain (as in the GenAI repo) or a thin custom layer.
-- **LLM + embeddings:** **OpenAI** — `gpt-4o` for answers, `text-embedding-3-large` for embeddings.
-- **Vector DB:** **Qdrant** (already used in the GenAI repo).
-- **Relational DB:** **Microsoft SQL Server** (the existing EMS DB — port **1433**).
-  - Driver: `pyodbc` (or `pymssql`) via **SQLAlchemy** (`mssql+pyodbc`). *Not* a MySQL driver.
-- **Document parsing:** `pypdf`/`pdfplumber` for text PDFs; **OCR** for scans via Tesseract
-  (`pytesseract`) or GPT-4o vision. Hindi OCR: Tesseract `hin` language pack.
-- **Auth:** JWT (access + refresh), password hashing with `passlib[bcrypt]`.
-- **Background jobs:** the ingestion pipeline runs async (FastAPI `BackgroundTasks` to start; move
-  to **Celery + Redis** or RQ once volume grows).
-- **Config:** `pydantic-settings` reading from `.env` (never hardcode secrets — see `rules.md`).
+| What | Command |
+|---|---|
+| Access rules + API (separate `svsu_test` database, OpenAI stubbed) | `cd backend && python -m pytest` |
+| Browser journeys (both servers running) | `cd frontend && E2E_ADMIN_ID=… E2E_ADMIN_PASS=… npx playwright test` |
+| Types and lint | `npx tsc --noEmit && npx eslint app components lib` |
 
-### Frontend
-- **Framework:** **Next.js (App Router) + TypeScript**.
-- **Styling:** **Tailwind CSS** with a custom design-token layer (see `design.md`) for the
-  Apple-style premium aesthetic. Component primitives from **shadcn/ui** (headless, restyled).
-- **State/data:** TanStack Query for server state; minimal global state (Zustand) for UI.
-- **Fonts:** system font stack (`-apple-system`/SF Pro feel) for UI; `Noto Sans/Serif Devanagari`
-  for Hindi.
+GitHub Actions runs the backend tests, type-check, lint and build on every push.
 
-### Infra
-- **Containers:** Docker Compose for local (api, qdrant, redis) — SQL Server is external/existing.
-- **Env:** `.env` per service, git-ignored. Secrets via the host/orchestrator in production.
+## 7. Operations
 
----
+- **Backups:** `python -m app.cli backup --to D:/backups/svsu` (daily from Task Scheduler/cron;
+  keeps 30). Restore with `pg_restore --clean --dbname <DATABASE_URL> <file>`.
+- **Reminder emails:** set `SMTP_*` in `.env`; otherwise reminders show in the app only.
+- **Production:** set `DATABASE_URL`, a long random `JWT_SECRET`, `CORS_ORIGINS` to the real site,
+  and leave `DEV_ADMIN_USER`/`DEV_ADMIN_PASS` blank. The API refuses to start with the default secret.
 
-## 5. Data source
+## 8. Data source
 
 The project's own PostgreSQL database (with pgvector). The old EMS connection was removed.
-
----
-
-## 6. Build order (suggested milestones)
-
-1. **M0 — Access & schema.** Reach the MSSQL DB, run the check query, map the real schema. Confirm
-   where documents/files live (rows? file paths? blobs?).
-2. **M1 — Backend skeleton.** FastAPI + settings + MSSQL connection + Qdrant + OpenAI wiring. Health checks.
-3. **M2 — Ingestion pipeline.** Upload → parse/OCR → chunk → embed → index. Review/publish gate.
-4. **M3 — RAG ask endpoint.** Retrieval + grounded answer + citations + permission filtering.
-5. **M4 — Frontend shell.** Apple-style layout, auth, Library + Viewer.
-6. **M5 — Ask UI.** Chat with citations and source panel.
-7. **M6 — Collections, Actions/Deadlines, Saved, Reports, Admin.**
-8. **M7 — Hardening.** Roles enforced server-side, audit log, Hindi QA, performance.
-
----
-
-## 7. Open questions to resolve with the stakeholder
-
-- Where exactly do source documents live — as files on disk, URLs, or BLOBs inside the EMS DB?
-- Expected volume (number of documents, total size) → affects OCR/indexing cost and infra.
-- Is OpenAI contractually allowed for this (potentially sensitive) official data? (Confirmed
-  "Cloud, OpenAI OK" direction — get it in writing from the university.)
-- SSO/existing identity system to integrate with, or standalone auth?
