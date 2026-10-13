@@ -1,17 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken } from "@/lib/api";
+import { api, getToken, setToken } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { Icon } from "@/components/icon";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true); // already signed in? ask the server first
   const [loginId, setU] = useState("");
   const [password, setP] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const signedIn = getToken()
+      ? api.me().then(() => true, () => { setToken(null); return false; }) // expired: clear it
+      : Promise.resolve(false);
+    signedIn.then((ok) => {
+      if (cancelled) return;
+      if (ok) router.replace("/");
+      else setChecking(false);
+    });
+    return () => { cancelled = true; };
+  }, [router]);
+
+  if (checking) return <div className="app-loading"><div className="spin" style={{ width: 28, height: 28 }} /></div>;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
