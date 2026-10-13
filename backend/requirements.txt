@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+openai
+python-multipart
+sqlalchemy
+psycopg[binary]
+pgvector
+pgserver
+pymupdf
+python-docx
+openpyxl
+pytesseract
+Pillow
+boto3
+pyjwt
+bcrypt

@@ -1,0 +1,1916 @@
+{
+ "TAGS": [
+  "HR",
+  "Leave",
+  "Attendance",
+  "Examination",
+  "Admissions",
+  "Fees",
+  "Scholarship",
+  "Finance",
+  "IT",
+  "Administration",
+  "Student Welfare",
+  "Academics"
+ ],
+ "AUDS": [
+  "Teaching Staff",
+  "Non-Teaching Staff",
+  "Students",
+  "HODs",
+  "HOIs",
+  "Management"
+ ],
+ "DEPTS": [
+  "Human Resources",
+  "Administration",
+  "Examination",
+  "Finance",
+  "Accounts",
+  "Student Welfare",
+  "IT Cell",
+  "Admissions",
+  "Estate Office"
+ ],
+ "TYPES": [
+  "Policy",
+  "Notice",
+  "Circular",
+  "Office Order",
+  "Guidelines",
+  "Letter",
+  "Holiday List",
+  "Minutes"
+ ],
+ "AUTHS": [
+  "Registrar",
+  "Controller of Examinations",
+  "Finance Officer",
+  "Dean Student Welfare",
+  "Director Admissions",
+  "Head, IT Cell",
+  "Estate Officer",
+  "Vice-Chancellor"
+ ],
+ "INSTS": [
+  "University (all colleges)",
+  "Subharti Medical College",
+  "Subharti Institute of Technology & Engineering",
+  "Subharti College of Law",
+  "Subharti Dental College",
+  "Subharti College of Nursing"
+ ],
+ "VIS": [
+  "Public (students & staff)",
+  "All Staff",
+  "Department only",
+  "Management Only"
+ ],
+ "VIS_DESC": {
+  "Public (students & staff)": "Visible to every signed-in student and employee.",
+  "All Staff": "Visible to all teaching and non-teaching employees.",
+  "Department only": "Visible only to members of the issuing department.",
+  "Management Only": "Visible to Registrar, Deans, HOIs and Finance Committee."
+ },
+ "docs": [
+  {
+   "related": [
+    "D03",
+    "D12"
+   ],
+   "revisionOf": "D02",
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Replaces the 2023 leave rules. Changes casual, earned and medical leave entitlements and moves applications to the ERP.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D01",
+   "title": "Revised Leave Rules for Teaching and Non-Teaching Staff 2026",
+   "ref": "SVSU/REG/HR/2026/114",
+   "type": "Policy",
+   "authority": "Registrar",
+   "dept": "Human Resources",
+   "date": "2026-07-01",
+   "effective": "2026-08-01",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff",
+    "HODs",
+    "HOIs"
+   ],
+   "tags": [
+    "HR",
+    "Leave"
+   ],
+   "visibility": "All Staff",
+   "status": "Active",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-07-01",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    },
+    {
+     "v": "1.1",
+     "date": "2026-07-04",
+     "by": "Anjali Verma",
+     "note": "Corrected effective date on page 2 (typo in OCR text)"
+    }
+   ],
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Revised Leave Rules for Teaching and Non-Teaching Staff, effective 1 August 2026.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "In supersession of Notification No. SVSU/REG/HR/2023/045 dated 12 April 2023, the competent authority has approved the following revised leave rules for all regular employees of the University and its constituent colleges.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "1. Casual Leave: Every regular employee is entitled to 12 days of casual leave in a calendar year. Casual leave cannot be carried forward to the next year.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "2. Casual leave may not be combined with earned leave or any other leave, except special casual leave sanctioned by the Registrar.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "3. Earned Leave: Non-vacation staff shall earn 30 days of earned leave per year, credited in two half-yearly instalments of 15 days on 1 January and 1 July. Teaching staff availing summer and winter vacation shall earn 10 days per year.",
+      "kind": "p"
+     }
+    ],
+    [
+     {
+      "id": "b6",
+      "text": "4. Medical Leave: An employee may avail up to 10 days of medical leave per year. Medical leave exceeding 3 consecutive days requires a certificate from a registered medical practitioner, preferably from Subharti Hospital.",
+      "kind": "p"
+     },
+     {
+      "id": "b7",
+      "text": "5. All leave applications must be submitted through the University ERP at least 3 working days in advance, except in cases of emergency or illness, which must be regularised within 2 working days of resuming duty.",
+      "kind": "p"
+     },
+     {
+      "id": "b8",
+      "text": "6. Leave of teaching staff during the examination period requires prior approval of the Controller of Examinations in addition to the Head of Department.",
+      "kind": "p"
+     },
+     {
+      "id": "b9",
+      "text": "7. Earned leave can be accumulated up to a maximum of 180 days.",
+      "kind": "p"
+     },
+     {
+      "id": "b10",
+      "text": "These rules come into force from 1 August 2026. All Heads of Institutions are requested to bring this notification to the notice of all employees.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-07-01",
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-07-01",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-07-01",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": "D01",
+   "expiry": "2026-07-31",
+   "description": "Historical record. Superseded by the Revised Leave Rules 2026 from 1 August 2026.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D02",
+   "title": "Leave Rules for University Employees 2023",
+   "ref": "SVSU/REG/HR/2023/045",
+   "type": "Policy",
+   "authority": "Registrar",
+   "dept": "Human Resources",
+   "date": "2023-04-12",
+   "effective": "2023-05-01",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff"
+   ],
+   "tags": [
+    "HR",
+    "Leave"
+   ],
+   "visibility": "All Staff",
+   "status": "Superseded",
+   "uploadedOn": "2024-02-10",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Leave Rules for University Employees.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. Casual Leave: Every regular employee is entitled to 10 days of casual leave in a calendar year.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. Earned Leave: Non-vacation staff shall earn 15 days of earned leave per year. Teaching staff availing vacation shall earn 8 days per year.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. Medical Leave: Up to 10 days of medical leave per year may be availed. A medical certificate is required for leave exceeding 2 consecutive days.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. Leave applications shall be submitted in the prescribed paper format to the Head of Department at least 2 days in advance.",
+      "kind": "p"
+     },
+     {
+      "id": "b6",
+      "text": "5. Earned leave can be accumulated up to a maximum of 120 days.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2024-02-10",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2024-02-10",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2024-02-10",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D01"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Office hours, grace period, late-arrival deductions and biometric re-enrolment.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D03",
+   "title": "Biometric Attendance and Office Timings",
+   "ref": "SVSU/REG/ADM/2026/089",
+   "type": "Policy",
+   "authority": "Registrar",
+   "dept": "Administration",
+   "date": "2026-06-10",
+   "effective": "2026-07-01",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff",
+    "HODs"
+   ],
+   "tags": [
+    "Attendance",
+    "HR",
+    "Administration"
+   ],
+   "visibility": "All Staff",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Biometric Attendance and Office Timings for Employees.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. Office hours for all employees are 9:00 AM to 4:30 PM, Monday to Saturday, except second and fourth Saturdays.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. A grace period of 15 minutes is permitted. Arrival after 9:15 AM shall be marked as late.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. Three late arrivals in a calendar month shall result in deduction of half a day of casual leave. If no casual leave is available, the deduction shall be made from salary.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. Employees must mark attendance at both arrival and departure. A missing punch must be regularised by the Head of Department through the ERP within 3 working days.",
+      "kind": "p"
+     },
+     {
+      "id": "b6",
+      "text": "5. All employees whose fingerprint registration is older than 2 years must re-enrol at the IT Cell, Room 104, Administrative Block, by 15 October 2026.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-06-10",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-06-10",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-06-10",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-06-10",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D05",
+    "D13"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-12-31",
+   "description": "Practical and theory exam dates, admit cards and internal marks deadline.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Rakesh Gupta",
+   "institution": "University (all colleges)",
+   "id": "D04",
+   "title": "Schedule of Odd Semester End-Term Examinations, Nov–Dec 2026",
+   "ref": "SVSU/COE/2026/317",
+   "type": "Notice",
+   "authority": "Controller of Examinations",
+   "dept": "Examination",
+   "date": "2026-09-28",
+   "effective": "2026-09-28",
+   "audience": [
+    "Students",
+    "Teaching Staff",
+    "HODs",
+    "HOIs"
+   ],
+   "tags": [
+    "Examination"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Schedule of Odd Semester End-Term Examinations, November–December 2026.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. Practical examinations for all undergraduate and postgraduate programmes shall be conducted from 9 November 2026 to 20 November 2026 at the respective colleges.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. Theory end-term examinations shall commence on 23 November 2026 and conclude on 12 December 2026. The detailed date sheet will be available on the University website.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. Admit cards can be downloaded from the student ERP from 16 November 2026. Students with outstanding fee dues will not be issued admit cards.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. Heads of Departments shall ensure that internal assessment marks are uploaded on the examination portal by 31 October 2026. Marks will not be accepted after this date without approval of the Controller of Examinations.",
+      "kind": "p"
+     },
+     {
+      "id": "b6",
+      "text": "5. Faculty members assigned invigilation duty shall follow the guidelines issued separately by the Examination Cell.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-09-28",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-09-28",
+     "by": "Rakesh Gupta",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Rakesh Gupta",
+     "date": "2026-09-28",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-09-28",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D04"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-12-31",
+   "description": "Hindi circular for invigilators: reporting time, mobile phones, duty changes and consent form.",
+   "fileType": "pdf",
+   "lang": "hi",
+   "uploadedBy": "Rakesh Gupta",
+   "institution": "University (all colleges)",
+   "id": "D05",
+   "title": "परीक्षा ड्यूटी हेतु दिशा-निर्देश (Invigilation Duty Guidelines)",
+   "ref": "SVSU/EXAM/2026/322",
+   "type": "Circular",
+   "authority": "Controller of Examinations",
+   "dept": "Examination",
+   "date": "2026-10-03",
+   "effective": "2026-10-03",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff"
+   ],
+   "tags": [
+    "Examination",
+    "Attendance"
+   ],
+   "visibility": "All Staff",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "विषय: विषम सेमेस्टर परीक्षा 2026 में कक्ष निरीक्षक ड्यूटी हेतु दिशा-निर्देश।",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. सभी कक्ष निरीक्षक परीक्षा प्रारम्भ होने से 45 मिनट पूर्व परीक्षा केन्द्र पर रिपोर्ट करेंगे।",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. परीक्षा कक्ष में कक्ष निरीक्षकों द्वारा मोबाइल फोन का प्रयोग पूर्णतः प्रतिबंधित है। मोबाइल फोन केन्द्र अधीक्षक के पास जमा कराने होंगे।",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. ड्यूटी में परिवर्तन केवल परीक्षा नियंत्रक की लिखित अनुमति से ही किया जा सकेगा।",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. ड्यूटी हेतु सहमति पत्र 20 अक्टूबर 2026 तक परीक्षा प्रकोष्ठ में जमा करना अनिवार्य है।",
+      "kind": "p"
+     },
+     {
+      "id": "b6",
+      "text": "5. अनुचित साधनों के प्रयोग की स्थिति में कक्ष निरीक्षक तत्काल केन्द्र अधीक्षक को सूचित करेंगे तथा निर्धारित प्रपत्र में रिपोर्ट प्रस्तुत करेंगे।",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-10-03",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-10-03",
+     "by": "Rakesh Gupta",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Rakesh Gupta",
+     "date": "2026-10-03",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-10-03",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D07"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2027-06-30",
+   "description": "Instalment due dates, late fine and payment counters.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D06",
+   "title": "Fee Payment Schedule, Session 2026–27",
+   "ref": "SVSU/REG/FEE/2026/201",
+   "type": "Notice",
+   "authority": "Registrar",
+   "dept": "Finance",
+   "date": "2026-07-15",
+   "effective": "2026-07-15",
+   "audience": [
+    "Students"
+   ],
+   "tags": [
+    "Fees",
+    "Finance"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Fee Payment Schedule for Academic Session 2026–27.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. The first instalment of tuition fee was payable at the time of admission or re-registration.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. The second instalment of tuition fee for all programmes shall be paid by 31 October 2026.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. A late fine of ₹100 per day shall be charged after the due date, subject to a maximum of ₹5,000.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. Fees can be paid online through the student ERP or at the Accounts counter, Administrative Block, between 10:00 AM and 3:00 PM.",
+      "kind": "p"
+     },
+     {
+      "id": "b6",
+      "text": "5. Students who do not clear dues before examinations will not be issued admit cards.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-07-15",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-07-15",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-07-15",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-07-15",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D06",
+    "D08"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Accounts circular extending the second instalment date. Not yet linked as a revision of the Registrar’s fee schedule.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Pooja Rastogi",
+   "institution": "University (all colleges)",
+   "id": "D07",
+   "title": "Extension of Last Date for Second Instalment Fee",
+   "ref": "SVSU/ACC/2026/58",
+   "type": "Circular",
+   "authority": "Finance Officer",
+   "dept": "Accounts",
+   "date": "2026-10-06",
+   "effective": "2026-10-06",
+   "audience": [
+    "Students"
+   ],
+   "tags": [
+    "Fees",
+    "Finance",
+    "Scholarship"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Extension in last date for payment of second instalment fee.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "In view of requests received from students and parents, the last date for payment of the second instalment fee for session 2026–27 is extended to 7 November 2026 without late fine.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "Students whose post-matric scholarship applications are under verification may pay the second instalment by 30 November 2026 on submission of the scholarship acknowledgement slip at the Accounts counter.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "This circular is issued with the approval of the Finance Officer.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-10-06",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-10-06",
+     "by": "Pooja Rastogi",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Pooja Rastogi",
+     "date": "2026-10-06",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-10-06",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D07"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-12-31",
+   "description": "Portal deadline, hard-copy submission and bank seeding advice.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Kavita Chauhan",
+   "institution": "University (all colleges)",
+   "id": "D08",
+   "title": "U.P. Post-Matric Scholarship 2026–27: Online Application",
+   "ref": "SVSU/SW/2026/77",
+   "type": "Notice",
+   "authority": "Dean Student Welfare",
+   "dept": "Student Welfare",
+   "date": "2026-09-20",
+   "effective": "2026-09-20",
+   "audience": [
+    "Students"
+   ],
+   "tags": [
+    "Scholarship",
+    "Fees",
+    "Student Welfare"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Uttar Pradesh Post-Matric Scholarship 2026–27 — online application.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Eligible students must complete the online application on the State scholarship portal by 10 November 2026.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "A printed copy of the submitted form, along with income certificate, category certificate (where applicable), previous year mark sheet and fee receipt, must be submitted to the Scholarship Section, Student Welfare Office, by 17 November 2026.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "Applications with mismatched Aadhaar-linked bank details will be rejected by the portal. Students are advised to verify bank seeding before applying.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-09-20",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-09-20",
+     "by": "Kavita Chauhan",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Kavita Chauhan",
+     "date": "2026-09-20",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-09-20",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Email use, password rotation, USB restrictions and incident reporting.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Mohit Saini",
+   "institution": "University (all colleges)",
+   "id": "D09",
+   "title": "Acceptable Use of IT Resources and Official Email",
+   "ref": "SVSU/IT/2026/12",
+   "type": "Policy",
+   "authority": "Head, IT Cell",
+   "dept": "IT Cell",
+   "date": "2026-05-02",
+   "effective": "2026-05-15",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff",
+    "HODs",
+    "HOIs"
+   ],
+   "tags": [
+    "IT",
+    "Administration"
+   ],
+   "visibility": "All Staff",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Acceptable Use of IT Resources and Official Email.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "1. Official communication must be sent only from the employee’s University email account. Personal email accounts must not be used for official records.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "2. Passwords for the ERP and email must be changed every 90 days and must not be shared with any other person.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "3. Personal USB storage devices may not be connected to computers in the Examination Cell and Accounts Department.",
+      "kind": "p"
+     },
+     {
+      "id": "b5",
+      "text": "4. Loss of a University laptop or any suspected security incident must be reported to the IT Cell within 24 hours.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-05-02",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-05-02",
+     "by": "Mohit Saini",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Mohit Saini",
+     "date": "2026-05-02",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-05-02",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-12-31",
+   "description": "Document verification deadline and return of originals.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D10",
+   "title": "Guidelines for Provisional Admission, Session 2026–27",
+   "ref": "SVSU/ADM/2026/140",
+   "type": "Guidelines",
+   "authority": "Director Admissions",
+   "dept": "Admissions",
+   "date": "2026-06-25",
+   "effective": "2026-07-01",
+   "audience": [
+    "Students",
+    "HOIs"
+   ],
+   "tags": [
+    "Admissions"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Guidelines for Provisional Admission, Session 2026–27.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Provisionally admitted students must complete document verification at the Admission Cell by 30 September 2026.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "Admission of students who fail to complete document verification within the stipulated time is liable to be cancelled without further notice.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "Original documents will be returned on the same day after verification. The University does not retain original certificates.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-06-25",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-06-25",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-06-25",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-06-25",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Temporary summer arrangement. Withdrawn.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D11",
+   "title": "Work From Home Arrangement for Non-Teaching Staff",
+   "ref": "SVSU/REG/ADM/2026/061",
+   "type": "Office Order",
+   "authority": "Registrar",
+   "dept": "Administration",
+   "date": "2026-05-20",
+   "effective": "2026-06-01",
+   "audience": [
+    "Non-Teaching Staff"
+   ],
+   "tags": [
+    "Administration",
+    "Attendance"
+   ],
+   "visibility": "All Staff",
+   "status": "Withdrawn",
+   "withdrawReason": "Withdrawn vide Office Order SVSU/REG/ADM/2026/074 dated 3 June 2026.",
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-05-20",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-05-20",
+     "kind": "ok"
+    },
+    {
+     "step": "Withdrawn",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-06-03",
+     "kind": "bad",
+     "note": "Withdrawn vide Office Order SVSU/REG/ADM/2026/074 dated 3 June 2026."
+    }
+   ],
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Work from home arrangement during summer months.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Non-teaching staff of identified sections may work from home on alternate Saturdays during June 2026 with prior approval of the reporting officer.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "This arrangement is temporary and subject to review.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-05-20",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-05-20",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ]
+  },
+  {
+   "related": [
+    "D01"
+   ],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Draft policy awaiting approval. Hidden from staff until published.",
+   "fileType": "docx",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D12",
+   "title": "Duty Leave for Conferences and Faculty Development Programmes",
+   "ref": "SVSU/REG/HR/2026/131",
+   "type": "Policy",
+   "authority": "Registrar",
+   "dept": "Human Resources",
+   "date": "2026-10-08",
+   "effective": "2026-11-01",
+   "audience": [
+    "Teaching Staff",
+    "HODs"
+   ],
+   "tags": [
+    "HR",
+    "Leave",
+    "Academics"
+   ],
+   "visibility": "Management Only",
+   "status": "Pending",
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2026-10-08",
+     "kind": "",
+     "note": "Draft prepared on instructions of the Registrar."
+    }
+   ],
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Grant of duty leave for academic conferences and FDPs (Draft for approval).",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Teaching staff may be granted up to 15 days of duty leave per academic year for presenting papers at conferences or attending AICTE/UGC-recognised FDPs.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "Applications must be recommended by the Head of Department and submitted at least 15 days before the event.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "A certificate of participation must be submitted within 7 days of return, failing which the period shall be treated as earned leave.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-10-08",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-10-08",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-12-31",
+   "description": "Gazetted and restricted holidays for calendar year 2026 (Excel sheet).",
+   "fileType": "xlsx",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D13",
+   "title": "Holiday List 2026",
+   "ref": "SVSU/REG/2025/410",
+   "type": "Holiday List",
+   "authority": "Registrar",
+   "dept": "Administration",
+   "date": "2025-12-15",
+   "effective": "2026-01-01",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff",
+    "Students"
+   ],
+   "tags": [
+    "Administration",
+    "Leave"
+   ],
+   "visibility": "Public (students & staff)",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "h0",
+      "text": [
+       "Holiday",
+       "Date",
+       "Day",
+       "Category"
+      ],
+      "kind": "hdr"
+     },
+     {
+      "id": "r1",
+      "text": [
+       "Republic Day",
+       "26 Jan 2026",
+       "Monday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r2",
+      "text": [
+       "Holi",
+       "4 Mar 2026",
+       "Wednesday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r3",
+      "text": [
+       "Independence Day",
+       "15 Aug 2026",
+       "Saturday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r4",
+      "text": [
+       "Gandhi Jayanti",
+       "2 Oct 2026",
+       "Friday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r5",
+      "text": [
+       "Dussehra",
+       "20 Oct 2026",
+       "Tuesday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r6",
+      "text": [
+       "Diwali",
+       "8 Nov 2026",
+       "Sunday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r7",
+      "text": [
+       "Govardhan Puja",
+       "9 Nov 2026",
+       "Monday",
+       "Restricted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r8",
+      "text": [
+       "Guru Nanak Jayanti",
+       "24 Nov 2026",
+       "Tuesday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     },
+     {
+      "id": "r9",
+      "text": [
+       "Christmas Day",
+       "25 Dec 2026",
+       "Friday",
+       "Gazetted"
+      ],
+      "kind": "row"
+     }
+    ]
+   ],
+   "uploadedOn": "2025-12-15",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2025-12-15",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2025-12-15",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2025-12-15",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "2026-02-28",
+   "description": "Scanned paper notice. OCR text layer available.",
+   "fileType": "scan",
+   "lang": "en",
+   "uploadedBy": "Anjali Verma",
+   "institution": "University (all colleges)",
+   "id": "D14",
+   "title": "Revised Office Timings — Winter Session 2025–26",
+   "ref": "SVSU/REG/ADM/2025/388",
+   "type": "Notice",
+   "authority": "Registrar",
+   "dept": "Administration",
+   "date": "2025-11-25",
+   "effective": "2025-12-01",
+   "audience": [
+    "Teaching Staff",
+    "Non-Teaching Staff"
+   ],
+   "tags": [
+    "Attendance",
+    "Administration"
+   ],
+   "visibility": "All Staff",
+   "status": "Expired",
+   "ocr": 92,
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Revised office timings during winter session.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Office timings from 1 December 2025 to 28 February 2026 shall be 9:30 AM to 4:30 PM.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "Grace period and late arrival rules shall remain unchanged.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2025-11-25",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2025-11-25",
+     "by": "Anjali Verma",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Anjali Verma",
+     "date": "2025-11-25",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2025-11-25",
+     "kind": "ok"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "New procedure for seminar hall bookings.",
+   "fileType": "docx",
+   "lang": "en",
+   "uploadedBy": "Sunil Kumar",
+   "institution": "University (all colleges)",
+   "id": "D15",
+   "title": "Booking and Use of Seminar Halls",
+   "ref": "SVSU/EST/2026/09",
+   "type": "Guidelines",
+   "authority": "Estate Officer",
+   "dept": "Estate Office",
+   "date": "2026-10-09",
+   "effective": "2026-10-15",
+   "audience": [
+    "Teaching Staff",
+    "HODs",
+    "Students"
+   ],
+   "tags": [
+    "Administration"
+   ],
+   "visibility": "All Staff",
+   "status": "Pending",
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Sunil Kumar",
+     "date": "2026-10-09",
+     "kind": ""
+    }
+   ],
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Procedure for booking seminar halls and auditoriums.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "Seminar halls must be booked through the Estate Office at least 5 working days before the event.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "Events extending beyond 6:00 PM require written permission of the Registrar.",
+      "kind": "p"
+     },
+     {
+      "id": "b4",
+      "text": "The organising department is responsible for any damage to equipment during the event.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-10-09",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-10-09",
+     "by": "Sunil Kumar",
+     "note": "Original upload"
+    }
+   ]
+  },
+  {
+   "related": [],
+   "revisionOf": null,
+   "supersededBy": null,
+   "expiry": "",
+   "description": "Finance Committee minutes. Restricted to management.",
+   "fileType": "pdf",
+   "lang": "en",
+   "uploadedBy": "Pooja Rastogi",
+   "institution": "University (all colleges)",
+   "id": "D16",
+   "title": "Annual Increment Recommendation FY 2027–28",
+   "ref": "SVSU/FC/2026/07",
+   "type": "Minutes",
+   "authority": "Finance Officer",
+   "dept": "Finance",
+   "date": "2026-09-30",
+   "effective": "2026-09-30",
+   "audience": [
+    "Management"
+   ],
+   "tags": [
+    "Finance",
+    "HR"
+   ],
+   "visibility": "Management Only",
+   "status": "Active",
+   "pages": [
+    [
+     {
+      "id": "b1",
+      "text": "Subject: Minutes of the Finance Committee meeting held on 29 September 2026.",
+      "kind": "subj"
+     },
+     {
+      "id": "b2",
+      "text": "The Finance Committee recommends an annual increment of 4% for regular employees from 1 April 2027, subject to approval of the Governing Body.",
+      "kind": "p"
+     },
+     {
+      "id": "b3",
+      "text": "The matter shall be placed before the Governing Body in its next meeting.",
+      "kind": "p"
+     }
+    ]
+   ],
+   "uploadedOn": "2026-09-30",
+   "versions": [
+    {
+     "v": "1.0",
+     "date": "2026-09-30",
+     "by": "Pooja Rastogi",
+     "note": "Original upload"
+    }
+   ],
+   "approvals": [
+    {
+     "step": "Submitted for approval",
+     "by": "Pooja Rastogi",
+     "date": "2026-09-30",
+     "kind": ""
+    },
+    {
+     "step": "Approved and published",
+     "by": "Dr. Neha Sharma, Deputy Registrar",
+     "date": "2026-09-30",
+     "kind": "ok"
+    }
+   ]
+  }
+ ],
+ "collections": [
+  {
+   "id": "C1",
+   "name": "Examination Cell — Odd Semester 2026",
+   "desc": "Exam schedule, invigilation guidelines and the holiday list for planning duty rosters.",
+   "docs": [
+    "D04",
+    "D05",
+    "D13"
+   ],
+   "owner": "Prof. Rajeev Tyagi",
+   "updated": "2026-10-03"
+  },
+  {
+   "id": "C2",
+   "name": "HR and Leave Policies",
+   "desc": "Current and historical leave rules, attendance and duty leave.",
+   "docs": [
+    "D01",
+    "D02",
+    "D03",
+    "D12"
+   ],
+   "owner": "Dr. Neha Sharma",
+   "updated": "2026-10-08"
+  },
+  {
+   "id": "C3",
+   "name": "Fees and Scholarships 2026–27",
+   "desc": "Fee schedule, extensions and scholarship notices for the student help desk.",
+   "docs": [
+    "D06",
+    "D07",
+    "D08"
+   ],
+   "owner": "Pooja Rastogi",
+   "updated": "2026-10-06"
+  },
+  {
+   "id": "C4",
+   "name": "New Faculty Onboarding",
+   "desc": "Documents every new faculty member should read in their first week.",
+   "docs": [
+    "D01",
+    "D03",
+    "D09",
+    "D13"
+   ],
+   "owner": "Dr. Neha Sharma",
+   "updated": "2026-08-14"
+  }
+ ],
+ "deadlines": [
+  {
+   "id": "dl1",
+   "title": "Biometric re-enrolment for old fingerprint records",
+   "date": "2026-10-15",
+   "doc": "D03",
+   "page": 1,
+   "block": "b6",
+   "quote": "re-enrol at the IT Cell, Room 104, Administrative Block, by 15 October 2026",
+   "owner": "IT Cell",
+   "aud": "All employees",
+   "dept": "Administration"
+  },
+  {
+   "id": "dl2",
+   "title": "Submit invigilation duty consent form",
+   "date": "2026-10-20",
+   "doc": "D05",
+   "page": 1,
+   "block": "b5",
+   "quote": "20 अक्टूबर 2026 तक परीक्षा प्रकोष्ठ में जमा करना अनिवार्य है",
+   "owner": "Examination Cell",
+   "aud": "Teaching staff on duty",
+   "dept": "Examination"
+  },
+  {
+   "id": "dl3",
+   "title": "Upload internal assessment marks",
+   "date": "2026-10-31",
+   "doc": "D04",
+   "page": 1,
+   "block": "b5",
+   "quote": "internal assessment marks are uploaded on the examination portal by 31 October 2026",
+   "owner": "HODs",
+   "aud": "HODs, Teaching staff",
+   "dept": "Examination"
+  },
+  {
+   "id": "dl4",
+   "title": "Second instalment fee (Registrar schedule)",
+   "date": "2026-10-31",
+   "doc": "D06",
+   "page": 1,
+   "block": "b3",
+   "quote": "shall be paid by 31 October 2026",
+   "owner": "Accounts",
+   "aud": "Students",
+   "dept": "Finance",
+   "conflict": true
+  },
+  {
+   "id": "dl5",
+   "title": "Second instalment fee (Accounts extension)",
+   "date": "2026-11-07",
+   "doc": "D07",
+   "page": 1,
+   "block": "b2",
+   "quote": "extended to 7 November 2026 without late fine",
+   "owner": "Accounts",
+   "aud": "Students",
+   "dept": "Accounts",
+   "conflict": true
+  },
+  {
+   "id": "dl6",
+   "title": "Practical examinations begin",
+   "date": "2026-11-09",
+   "doc": "D04",
+   "page": 1,
+   "block": "b2",
+   "quote": "from 9 November 2026 to 20 November 2026",
+   "owner": "Colleges",
+   "aud": "Students, Teaching staff",
+   "dept": "Examination"
+  },
+  {
+   "id": "dl7",
+   "title": "Scholarship online application closes",
+   "date": "2026-11-10",
+   "doc": "D08",
+   "page": 1,
+   "block": "b2",
+   "quote": "complete the online application on the State scholarship portal by 10 November 2026",
+   "owner": "Student Welfare",
+   "aud": "Students",
+   "dept": "Student Welfare"
+  },
+  {
+   "id": "dl8",
+   "title": "Admit cards available on ERP",
+   "date": "2026-11-16",
+   "doc": "D04",
+   "page": 1,
+   "block": "b4",
+   "quote": "Admit cards can be downloaded from the student ERP from 16 November 2026",
+   "owner": "Examination Cell",
+   "aud": "Students",
+   "dept": "Examination"
+  },
+  {
+   "id": "dl9",
+   "title": "Scholarship hard copy submission",
+   "date": "2026-11-17",
+   "doc": "D08",
+   "page": 1,
+   "block": "b3",
+   "quote": "must be submitted to the Scholarship Section, Student Welfare Office, by 17 November 2026",
+   "owner": "Student Welfare",
+   "aud": "Students",
+   "dept": "Student Welfare"
+  },
+  {
+   "id": "dl10",
+   "title": "Theory end-term examinations begin",
+   "date": "2026-11-23",
+   "doc": "D04",
+   "page": 1,
+   "block": "b3",
+   "quote": "commence on 23 November 2026 and conclude on 12 December 2026",
+   "owner": "Examination Cell",
+   "aud": "Students, Teaching staff",
+   "dept": "Examination"
+  },
+  {
+   "id": "dl11",
+   "title": "Fee date for students with scholarship under verification",
+   "date": "2026-11-30",
+   "doc": "D07",
+   "page": 1,
+   "block": "b3",
+   "quote": "may pay the second instalment by 30 November 2026",
+   "owner": "Accounts",
+   "aud": "Students",
+   "dept": "Accounts"
+  },
+  {
+   "id": "dl12",
+   "title": "Document verification for provisional admissions",
+   "date": "2026-09-30",
+   "doc": "D10",
+   "page": 1,
+   "block": "b2",
+   "quote": "complete document verification at the Admission Cell by 30 September 2026",
+   "owner": "Admission Cell",
+   "aud": "Students",
+   "dept": "Admissions",
+   "done": true
+  }
+ ],
+ "unanswered": [
+  {
+   "id": "u1",
+   "q": "What is the maternity leave policy for contract staff?",
+   "count": 3,
+   "dept": "Human Resources",
+   "status": "Open",
+   "last": "2026-10-11"
+  },
+  {
+   "id": "u2",
+   "q": "TA/DA rates for examination duty outside Meerut?",
+   "count": 4,
+   "dept": "Examination",
+   "status": "Assigned",
+   "last": "2026-10-09"
+  },
+  {
+   "id": "u3",
+   "q": "Is there a dress code for non-teaching staff?",
+   "count": 2,
+   "dept": "Administration",
+   "status": "Open",
+   "last": "2026-10-07"
+  },
+  {
+   "id": "u4",
+   "q": "Hostel fee refund rules on withdrawal of admission",
+   "count": 1,
+   "dept": "Finance",
+   "status": "Open",
+   "last": "2026-10-05"
+  }
+ ],
+ "users": [
+  {
+   "id": "us1",
+   "name": "Dr. Neha Sharma",
+   "email": "neha.sharma@svsu.example",
+   "role": "Administrator",
+   "dept": "Administration",
+   "active": true,
+   "last": "Today"
+  },
+  {
+   "id": "us2",
+   "name": "Prof. Rajeev Tyagi",
+   "email": "coe@svsu.example",
+   "role": "Approver",
+   "dept": "Examination",
+   "active": true,
+   "last": "Today"
+  },
+  {
+   "id": "us3",
+   "name": "Anjali Verma",
+   "email": "anjali.verma@svsu.example",
+   "role": "Uploader",
+   "dept": "Human Resources",
+   "active": true,
+   "last": "Yesterday"
+  },
+  {
+   "id": "us4",
+   "name": "Pooja Rastogi",
+   "email": "pooja.rastogi@svsu.example",
+   "role": "Uploader",
+   "dept": "Accounts",
+   "active": true,
+   "last": "6 Oct 2026"
+  },
+  {
+   "id": "us5",
+   "name": "Mohit Saini",
+   "email": "mohit.saini@svsu.example",
+   "role": "Administrator",
+   "dept": "IT Cell",
+   "active": true,
+   "last": "Today"
+  },
+  {
+   "id": "us6",
+   "name": "Dr. Sameer Khan",
+   "email": "hod.cse@svsu.example",
+   "role": "Viewer",
+   "dept": "Examination",
+   "active": true,
+   "last": "10 Oct 2026"
+  },
+  {
+   "id": "us7",
+   "name": "Kavita Chauhan",
+   "email": "dsw.office@svsu.example",
+   "role": "Uploader",
+   "dept": "Student Welfare",
+   "active": true,
+   "last": "20 Sep 2026"
+  },
+  {
+   "id": "us8",
+   "name": "Rakesh Gupta",
+   "email": "exam.cell@svsu.example",
+   "role": "Uploader",
+   "dept": "Examination",
+   "active": false,
+   "last": "3 Oct 2026"
+  }
+ ],
+ "roleMatrix": {
+  "Administrator": [
+   1,
+   1,
+   1,
+   1
+  ],
+  "Approver": [
+   1,
+   1,
+   1,
+   1
+  ],
+  "Uploader": [
+   1,
+   1,
+   1,
+   0
+  ],
+  "Viewer": [
+   1,
+   1,
+   1,
+   0
+  ]
+ },
+ "audit": [
+  {
+   "t": "12 Oct 2026, 9:42 AM",
+   "who": "Dr. Neha Sharma",
+   "act": "Viewed",
+   "what": "Annual Increment Recommendation FY 2027–28"
+  },
+  {
+   "t": "09 Oct 2026, 4:10 PM",
+   "who": "Sunil Kumar",
+   "act": "Submitted",
+   "what": "Booking and Use of Seminar Halls"
+  },
+  {
+   "t": "08 Oct 2026, 11:25 AM",
+   "who": "Anjali Verma",
+   "act": "Submitted",
+   "what": "Duty Leave for Conferences and FDPs"
+  },
+  {
+   "t": "06 Oct 2026, 2:05 PM",
+   "who": "Pooja Rastogi",
+   "act": "Published",
+   "what": "Extension of Last Date for Second Instalment Fee"
+  },
+  {
+   "t": "03 Oct 2026, 10:12 AM",
+   "who": "Prof. Rajeev Tyagi",
+   "act": "Approved",
+   "what": "परीक्षा ड्यूटी हेतु दिशा-निर्देश"
+  },
+  {
+   "t": "01 Oct 2026, 5:30 PM",
+   "who": "Mohit Saini",
+   "act": "Changed access",
+   "what": "Annual Increment Recommendation → Management Only"
+  }
+ ],
+ "aiSettings": {
+  "requireCite": true,
+  "histOnly": true,
+  "showConf": true,
+  "logUnans": true,
+  "lang": "auto",
+  "maxSources": 8
+ },
+ "bmPassages": [
+  {
+   "id": "bp1",
+   "doc": "D04",
+   "page": 1,
+   "block": "b5",
+   "quote": "internal assessment marks are uploaded on the examination portal by 31 October 2026",
+   "note": "Remind HODs in Monday meeting",
+   "when": "10 Oct 2026"
+  }
+ ],
+ "feedback": [
+  {
+   "id": "f1",
+   "q": "What is the late arrival rule?",
+   "rating": "up",
+   "reason": "",
+   "comment": "Clear and matched the notice.",
+   "who": "Dr. Sameer Khan",
+   "when": "11 Oct 2026"
+  },
+  {
+   "id": "f2",
+   "q": "When is the last date for the second instalment fee?",
+   "rating": "down",
+   "reason": "Conflicting information",
+   "comment": "Students are confused. Please resolve which circular applies.",
+   "who": "Kavita Chauhan",
+   "when": "10 Oct 2026"
+  },
+  {
+   "id": "f3",
+   "q": "Has the earned leave rule changed?",
+   "rating": "up",
+   "reason": "",
+   "comment": "Comparison table is useful.",
+   "who": "Anjali Verma",
+   "when": "8 Oct 2026"
+  },
+  {
+   "id": "f4",
+   "q": "Office timings in winter?",
+   "rating": "down",
+   "reason": "Outdated source",
+   "comment": "Showed last winter’s notice. New one not uploaded yet.",
+   "who": "Dr. Sameer Khan",
+   "when": "7 Oct 2026"
+  }
+ ],
+ "conflicts": [
+  {
+   "id": "cf1",
+   "docs": [
+    "D06",
+    "D07"
+   ],
+   "topic": "Second instalment fee due date (31 Oct vs 7 Nov 2026)",
+   "status": "Open",
+   "reported": "10 Oct 2026",
+   "by": "Kavita Chauhan"
+  }
+ ]
+}
