@@ -6,8 +6,8 @@ with citations to the exact paragraph. See [docs/](docs/) for `instructions.md`,
 ## How it works
 
 1. **Upload, once per document.** Text is read from the file. Scanned PDFs and photos go through
-   **OCR**: Tesseract for Hindi pages, and AWS Textract for other pages when AWS keys are set
-   (Tesseract otherwise). The text is split into paragraphs.
+   **OCR with Tesseract**: each page's script is detected and read with the Hindi or English model.
+   The text is split into paragraphs.
 2. **Embed and store.** Each paragraph is turned into an embedding (OpenAI) and stored in
    **PostgreSQL with pgvector**, next to the document's details.
 3. **Ask.** A question is embedded and matched against the stored paragraphs — only in documents the
@@ -35,7 +35,7 @@ on a server with the `vector` extension.
 cd backend
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env          # fill in OPENAI_API_KEY (and AWS keys for Textract)
+copy .env.example .env          # fill in OPENAI_API_KEY
 uvicorn app.main:app --port 8000
 
 # frontend

@@ -106,34 +106,9 @@ database, and (c) support the premium frontend.
 
 ---
 
-## 5. Data source — MSSQL (EMS) status
+## 5. Data source
 
-- Target DB: `TestDemo` on `182.74.167.40:1433` (SQL Server, **not** MySQL — 1433 confirms it).
-- **Not yet verified:** the host is unreachable from the dev machine (ping + TCP 1433 both fail).
-  Likely an **IP allowlist / VPN** requirement, or remote TCP connections disabled.
-- **Action required:** have someone with access either whitelist the dev IP, provide VPN, or run
-  the check query below and share the output, so we can confirm there is sufficient data and map
-  the schema before writing ingestion code.
-
-**Data-sufficiency check query (run once reachable):**
-```sql
--- 1. List tables and row counts
-SELECT t.name AS table_name, SUM(p.rows) AS row_count
-FROM sys.tables t
-JOIN sys.partitions p ON t.object_id = p.object_id AND p.index_id IN (0,1)
-GROUP BY t.name
-ORDER BY row_count DESC;
-
--- 2. Look for document/file columns (candidates for ingestion)
-SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE COLUMN_NAME LIKE '%file%' OR COLUMN_NAME LIKE '%doc%'
-   OR COLUMN_NAME LIKE '%path%' OR COLUMN_NAME LIKE '%pdf%'
-   OR DATA_TYPE IN ('varbinary','image')
-ORDER BY TABLE_NAME;
-```
-Connect with: `sqlcmd -S 182.74.167.40,1433 -U emsai -d TestDemo -C` (password via `SQLCMDPASSWORD`
-env var, never on the command line).
+The project's own PostgreSQL database (with pgvector). The old EMS connection was removed.
 
 ---
 

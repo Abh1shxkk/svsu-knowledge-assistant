@@ -2,7 +2,7 @@
 
 How to build all of this — order, design and effort — is in [docs/PLAN.md](docs/PLAN.md).
 
-Current state: login, all 12 screens, uploads with OCR (Tesseract; Textract wired in),
+Current state: login, all 12 screens, uploads with OCR (Tesseract, Hindi + English),
 search and cited answers from PostgreSQL + pgvector, light/dark themes — built and tested locally.
 Below is what still needs doing, most important first.
 
@@ -30,7 +30,6 @@ Below is what still needs doing, most important first.
 - [ ] Admin: rename tags; make the access-level grid actually control access
 
 ## 3. Not tested or not set up yet
-- [ ] **AWS Textract** — needs `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in `backend/.env`
 - [ ] **Hindi OCR quality** — about 77% on a test scan; Hindi uploads need a human check of the
       extracted text before submitting
 - [ ] Automated tests (backend API + key screens)

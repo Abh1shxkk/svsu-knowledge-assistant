@@ -37,8 +37,7 @@ under each answer. Phase 2.1 adds keyword matching alongside step 3.
 ## 1. Where we are
 
 **Working today (tested locally):** login with app-managed accounts; all 12 screens; light/dark
-themes; uploads of PDF, scans, Word, Excel, images and text; OCR with Tesseract (Hindi + English)
-and AWS Textract wired in; paragraph embeddings stored in PostgreSQL + pgvector; cited answers
+themes; uploads of PDF, scans, Word, Excel, images and text; OCR with Tesseract (Hindi + English); paragraph embeddings stored in PostgreSQL + pgvector; cited answers
 in English and Hindi, including conflicting, revised, historical and "not in the records" cases.
 
 **Why the current shape won't scale or isn't safe** (all confirmed in the code):
@@ -72,9 +71,9 @@ in English and Hindi, including conflicting, revised, historical and "not in the
    │                 original uploaded files, exports
    ▼
  Worker (same codebase, run 1..N copies)
-     picks jobs from the queue: OCR (Tesseract / Textract) → paragraphs → suggested details →
+     picks jobs from the queue: OCR (Tesseract) → paragraphs → suggested details →
      embeddings → deadline extraction · scheduled jobs: reminders, cleanup
-     └──► OpenAI (answers, embeddings) · AWS Textract · email (SMTP / AWS SES)
+     └──► OpenAI (answers, embeddings) · email (SMTP / AWS SES)
 ```
 
 **Principles**
@@ -147,7 +146,7 @@ running `create-admin` for the real administrator and removing the test admin.
 | 1.2 | **Background jobs**: upload returns at once with status "Processing"; a worker runs OCR → paragraphs → suggested details → embeddings. Retries with backoff, max attempts, failed jobs kept with their error | A 50-page scan doesn't block the page; the upload queue shows live progress |
 | 1.3 | **Embed once**: hash each paragraph; on re-upload or edit, only changed paragraphs are re-embedded; embeddings sent in batches | Re-saving metadata costs no embedding calls |
 | 1.4 | **OCR quality**: clean the image before OCR (greyscale, deskew, threshold), per-page confidence, low-confidence pages flagged; extracted text **editable** on the upload screen before submitting | Reviewer sees which pages need checking and can correct them |
-| 1.5 | **Textract**: test with real keys; for multi-page PDFs use the asynchronous API via S3 (one job per document, not per page); monthly page cap | English scans read by Textract within the cap |
+| 1.5 | **OCR throughput**: run Tesseract per page in parallel within the worker; cap pages per upload from settings | A 50-page scan is read in minutes, not tens of minutes |
 | 1.6 | **Viewer shows the original** (PDF rendered in the browser) with the cited passage highlighted, plus the extracted text alongside | Citation opens the real document at the right place |
 | 1.7 | **Duplicates** detected on the server by file hash and title similarity; upload limits (size, pages) from settings | Same file uploaded twice is flagged before processing |
 
@@ -180,9 +179,9 @@ running `create-admin` for the real administrator and removing the test admin.
 | 4.1 | **Tests**: pytest for the access policy, state machine and API (against a real test PostgreSQL); Playwright for login → upload → review → ask |
 | 4.2 | **CI** on GitHub Actions: lint, type-check, tests and build on every push; nothing merges red |
 | 4.3 | **Containers**: images for web, API and worker; `docker-compose` for development with the official `pgvector/pgvector` PostgreSQL image (replaces the local `pgserver`) |
-| 4.4 | **Hosting** (recommended: AWS, since Textract is already AWS): managed PostgreSQL with pgvector (RDS), S3, SES, the three containers on a VM or ECS; HTTPS via a reverse proxy; CORS locked to the real domain; security headers |
+| 4.4 | **Hosting** (AWS or a university server): managed PostgreSQL with pgvector (RDS), S3, SES, the three containers on a VM or ECS; HTTPS via a reverse proxy; CORS locked to the real domain; security headers |
 | 4.5 | **Backups**: automated daily database snapshots with point-in-time recovery, S3 versioning; a tested restore |
-| 4.6 | **Monitoring**: structured logs, error tracking, health checks, metrics for request latency, job-queue depth and daily OpenAI/Textract spend |
+| 4.6 | **Monitoring**: structured logs, error tracking, health checks, metrics for request latency, job-queue depth and daily OpenAI spend |
 | 4.7 | **Docs**: rewrite `instructions.md`, `design.md`, `rules.md` for the real system; add a short runbook (deploy, restore, rotate keys, add a user) |
 
 ---
@@ -195,24 +194,25 @@ running `create-admin` for the real administrator and removing the test admin.
   pooling (PgBouncer) once there are more than a handful of copies.
 - **Uploads:** workers scale separately from the API, based on queue length; a burst of uploads
   waits in the queue instead of slowing everyone down.
-- **Main running cost is OpenAI**, then Textract. Phase 2.5 keeps both measured and capped.
+- **Main running cost is OpenAI.** OCR is Tesseract, so it costs only server time. Phase 2.5 keeps
+  OpenAI spend measured and capped.
 
 ## 6. Decisions needed
 
 | Decision | Options / recommendation |
 |---|---|
-| Hosting | **AWS (recommended)** — Textract, S3, SES and RDS in one place — or a university server |
+| Hosting | AWS (S3, SES, RDS in one place) or a university server — both work, since OCR runs locally |
 | Email for reminders | University SMTP server, or AWS SES |
 | Approval to send official records to OpenAI | Needs sign-off from the university; otherwise plan for a self-hosted model |
 | Real administrators and approvers | Names and departments, so the first accounts and the access matrix are right |
 | Retention | How long to keep chats, audit log and withdrawn documents |
-| Monthly budget | OpenAI and Textract spend caps |
+| Monthly budget | OpenAI spend cap |
 
 ## 7. Risks
 
 | Risk | Mitigation |
 |---|---|
 | Hindi OCR accuracy (~77% on a test scan) | Image clean-up (1.4), low-confidence flagging and human correction before submit |
-| Textract can't read Hindi | Hindi always goes to Tesseract; detection is per page |
+| OCR speed on long scans | OCR runs in background jobs (1.2); add worker copies if uploads queue up |
 | Cost growth | Caching, budgets, smaller models for routine tasks (2.5) |
 | One developer | Phase 0 first; each phase ships something usable on its own |

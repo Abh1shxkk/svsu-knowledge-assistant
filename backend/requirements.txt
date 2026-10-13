@@ -12,6 +12,5 @@ python-docx
 openpyxl
 pytesseract
 Pillow
-boto3
 pyjwt
 bcrypt

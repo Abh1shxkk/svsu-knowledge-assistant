@@ -15,13 +15,9 @@ class Settings(BaseSettings):
     pg_data_dir: str = "D:/PostgreSQL/data"
     db_name: str = "svsu_assistant"
 
-    # OCR runs once, at upload. Hindi pages use Tesseract (Textract can't read Devanagari); other
-    # pages use AWS Textract when keys are set, otherwise Tesseract.
+    # OCR (Tesseract) runs once, at upload. Needs the eng, hin and osd language files in tessdata_dir.
     tesseract_cmd: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     tessdata_dir: str = "D:/Tesseract-OCR/tessdata"
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    aws_region: str = "ap-south-1"
 
     # Load the prototype's sample documents into an empty database (development only).
     demo_data: bool = False
