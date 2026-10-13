@@ -40,7 +40,7 @@ export const api = {
   records: () => call<Records>("/records"),
   put: (kind: Kind, id: string, data: unknown) => call(`/records/${kind}/${encodeURIComponent(id)}`, jsonBody("PUT", data)),
   remove: (kind: Kind, id: string) => call(`/records/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  ask: (body: { question: string; scope_ids: string[]; permitted_ids: string[]; lang: string }) =>
+  ask: (body: { question: string; scope_ids: string[]; permitted_ids: string[]; lang: string; history: string[] }) =>
     call<Answer>("/ask", jsonBody("POST", body)),
   extract: (file: File) => {
     const fd = new FormData();

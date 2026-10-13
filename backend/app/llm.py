@@ -11,10 +11,10 @@ def client() -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key)
 
 
-def chat(system: str, user: str, as_json: bool = False):
+def chat(system: str, user: str, as_json: bool = False, model: str | None = None):
     """One system+user turn. Returns text, or a parsed dict when as_json=True."""
     reply = client().chat.completions.create(
-        model=settings.chat_model,
+        model=model or settings.chat_model,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         response_format={"type": "json_object"} if as_json else None,
     )

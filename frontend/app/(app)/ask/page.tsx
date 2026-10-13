@@ -67,6 +67,8 @@ function Ask() {
         scope_ids: scopeDocs(st).map((d) => d.id),
         permitted_ids: answerable(st).map((d) => d.id),
         lang,
+        // Earlier questions in this chat, so a follow-up like "and in 2023?" can be rewritten in full.
+        history: chat.msgs.filter((m): m is Extract<Msg, { role: "user" }> => m.role === "user").map((m) => m.text).slice(0, -1),
       });
       finish(chat.id, aiMsg.id, { answer });
       if (answer.label === "Insufficient evidence") logUnanswered(q);
@@ -190,6 +192,9 @@ function Message({ m, onCite, onAsk, toast, save, chat }: {
     <div className="ma" id={m.id}><div className="bot"><Icon n="spark" /></div><div className="box">
       <div className="mh"><b>SVSU Assistant</b><span className={`pill plain ${KIND_INFO[a.label] ?? "mute"}`}>{a.label}</span>
         <span>From documents</span></div>
+      {a.queries && a.queries.length > 0 && (
+        <div className="searched"><Icon n="search" s /><span>Searched for: {a.queries.join(" · ")}</span></div>
+      )}
       <AnswerView answer={a} msgId={m.id} lang={lang} onCite={(i) => onCite(m as Extract<Msg, { role: "ai" }>, i)} onAsk={onAsk} />
       <div className="macts">
         <button className="btn ghost" onClick={() => { navigator.clipboard?.writeText(answerText(a)); toast("Copied"); }} type="button"><Icon n="copy" s /> Copy</button>

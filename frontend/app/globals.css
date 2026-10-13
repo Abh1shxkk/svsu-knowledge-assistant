@@ -698,3 +698,5 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 }
 @media (max-width:560px){ .tiles,.lists2,.statrow{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){ .app,.wrap,.tile,.stat,.kpi,.nav a{transition:none;animation:none} }
+.searched{display:flex;gap:7px;align-items:flex-start;padding:8px 16px 0;font-size:11.5px;color:var(--fg-3)}
+.searched svg{flex:none;margin-top:1px}

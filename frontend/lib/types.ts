@@ -22,7 +22,7 @@ export type Cite = { doc: string; page: number; block: string; quote: string };
 export type BodyPart = { p?: string; ul?: string[]; table?: { head: string[]; rows: string[][] }; sub?: string; opts?: string[] };
 export type Answer = {
   source: "documents"; label: string; banner: { kind: string; text: string } | null;
-  body: BodyPart[]; cites: Cite[]; follow: string[]; missing?: string[];
+  body: BodyPart[]; cites: Cite[]; follow: string[]; missing?: string[]; queries?: string[];
 };
 export type Msg =
   | { id: string; role: "user"; text: string }

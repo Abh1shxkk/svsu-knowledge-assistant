@@ -30,6 +30,7 @@ class Ask(BaseModel):
     scope_ids: list[str]       # documents the person chose to search
     permitted_ids: list[str]   # every document the person may see
     lang: str = "auto"         # auto | en | hi
+    history: list[str] = []    # earlier questions in this chat, so follow-ups can be rewritten
 
 
 @app.get("/health")
@@ -122,7 +123,7 @@ def delete_record(kind: str, id: str,
 @app.post("/ask")
 def ask(body: Ask, user: dict = Depends(auth.current_user)):
     docs = {d["id"]: d for d in store.all_records()["documents"]}
-    return rag.answer(body.question, body.scope_ids, body.permitted_ids, docs, body.lang)
+    return rag.answer(body.question, body.scope_ids, body.permitted_ids, docs, body.lang, body.history)
 
 
 @app.post("/extract")

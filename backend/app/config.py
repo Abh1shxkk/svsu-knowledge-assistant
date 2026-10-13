@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     openai_api_key: str = ""
     chat_model: str = "gpt-4o"
+    fast_model: str = "gpt-4o-mini"  # routine steps, e.g. rewriting a question into search queries
     embed_model: str = "text-embedding-3-small"  # 1536 dims
     embed_dim: int = 1536
     top_k: int = 8  # paragraphs read per answer

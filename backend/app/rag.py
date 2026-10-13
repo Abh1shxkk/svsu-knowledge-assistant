@@ -84,20 +84,68 @@ def _search(vector: list[float], ids: list[str], limit: int) -> list[dict]:
         return [dict(r._mapping) for r in c.execute(q)]
 
 
-def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: dict, lang: str) -> dict:
-    """docs: id -> document record. Answers only from answerable documents inside the scope."""
+_REWRITE = (
+    "You turn a staff member's question into queries for a semantic search over Swami Vivekanand Subharti "
+    "University's official documents (notices, circulars, policies), written in English and Hindi. "
+    "Write 2 or 3 short, self-contained search queries: one in English, one in Hindi (Devanagari), and one "
+    "more only if the question has a second part. Expand abbreviations and informal wording (CL = casual "
+    "leave, EL = earned leave, kitne = how many). If it is a follow-up, use the earlier questions to say "
+    "what it refers to. Keep names, dates and reference numbers exactly. Do not answer the question. "
+    'Reply as JSON {"queries": ["...", "..."]}.'
+)
+
+
+def rewrite(question: str, history: list[str]) -> list[str]:
+    """The LLM only rewrites the question for search; the search itself is semantic (pgvector)."""
+    earlier = "\n".join(f"- {h}" for h in history[-3:])
+    res = chat(_REWRITE, (f"Earlier questions:\n{earlier}\n\n" if earlier else "") + f"Question: {question}",
+               as_json=True, model=settings.fast_model)
+    queries = [q.strip() for q in res.get("queries") or [] if isinstance(q, str) and q.strip()][:3]
+    return list(dict.fromkeys([question, *queries]))  # the person's own words are always searched too
+
+
+_PER_DOC = 3  # so one long document can't crowd out the others (e.g. old vs new rules)
+
+
+def _search_all(vectors: list[list[float]], ids: list[str], limit: int) -> list[dict]:
+    """Search with every query, keep each paragraph's best match, and cap paragraphs per document."""
+    best: dict[tuple, dict] = {}
+    for v in vectors:
+        for h in _search(v, ids, limit * 3):
+            key = (h["doc_id"], h["page"], h["block"])
+            if key not in best or h["score"] > best[key]["score"]:
+                best[key] = h
+    picked, per_doc = [], {}
+    for h in sorted(best.values(), key=lambda h: -h["score"]):
+        if per_doc.get(h["doc_id"], 0) < _PER_DOC:
+            picked.append(h)
+            per_doc[h["doc_id"]] = per_doc.get(h["doc_id"], 0) + 1
+        if len(picked) == limit:
+            break
+    return picked
+
+
+def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: dict, lang: str,
+           history: list[str] = ()) -> dict:
+    """docs: id -> document record. Answers only from answerable documents inside the scope.
+
+    1. the LLM rewrites the question into search queries, 2. semantic search finds the paragraphs,
+    3. the LLM writes the answer from those paragraphs only, citing each one.
+    """
     usable = lambda ids: [i for i in ids if i in docs and docs[i]["status"] in ANSWERABLE]  # noqa: E731
-    vector = embed([question])[0]
-    hits = _search(vector, usable(scope_ids), settings.top_k)
-    result = _generate(question, hits, docs, lang) if hits else _INSUFFICIENT
+    queries = rewrite(question, list(history))
+    vectors = embed(queries)
+    hits = _search_all(vectors, usable(scope_ids), settings.top_k)
+    result = _generate(question, hits, docs, lang) if hits else dict(_INSUFFICIENT)
+    result["queries"] = queries[1:] or queries
     if result["label"] == "Insufficient evidence" and set(scope_ids) != set(permitted_ids):
         # Nothing in scope, but maybe in documents the person narrowed away: say which.
-        outside = {h["doc_id"] for h in _search(vector, usable(permitted_ids), 5)
+        outside = {h["doc_id"] for h in _search_all(vectors, usable(permitted_ids), 5)
                    if h["score"] >= 0.4} - set(scope_ids)
         if outside:
             return {
                 "source": "documents", "label": "Outside your scope", "cites": [], "follow": [],
-                "missing": sorted(outside),
+                "queries": result["queries"], "missing": sorted(outside),
                 "banner": {"kind": "scope", "text": "The documents needed for this answer are outside "
                                                     "the scope you selected."},
                 "body": [{"p": "Your current scope doesn't include the records that answer this question. "

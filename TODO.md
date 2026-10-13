@@ -1,5 +1,7 @@
 # What's left
 
+How to build all of this — order, design and effort — is in [docs/PLAN.md](docs/PLAN.md).
+
 Current state: login, all 12 screens, uploads with OCR (Tesseract; Textract wired in),
 search and cited answers from PostgreSQL + pgvector, light/dark themes — built and tested locally.
 Below is what still needs doing, most important first.
