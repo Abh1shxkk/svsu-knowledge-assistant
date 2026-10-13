@@ -17,7 +17,7 @@ export default function DocDetail() {
   const s = useStore();
   const d = getDoc(s, id);
   const [tab, setTab] = useState("overview");
-  const { openViewer, openModal, save, toast, set, logAudit } = useStore.getState();
+  const { openViewer, openModal, save, toast, set } = useStore.getState();
 
   if (!d) return <div className="wrap"><div className="empty">Document not found.</div></div>;
   const admin = canUpload(s);
@@ -30,7 +30,7 @@ export default function DocDetail() {
   ];
 
   const askAbout = () => { set({ scope: { mode: "files", files: [d.id], coll: null }, activeChat: null }); toast("Scope set to this document"); router.push("/ask"); };
-  const restore = () => { void save("documents", { ...d, status: "Active" }); logAudit("Restored", d.title); toast("Document restored to Active"); };
+  const restore = () => { void save("documents", { ...d, status: "Active" }); toast("Document restored to Active"); };
 
   return (
     <div className="wrap">
@@ -120,7 +120,6 @@ export default function DocDetail() {
 }
 
 function Overview({ d, admin }: { d: Doc; admin: boolean }) {
-  const { openViewer } = useStore.getState();
   const s = useStore();
   const sup = d.supersededBy ? getDoc(s, d.supersededBy) : null;
   return (
@@ -181,8 +180,8 @@ function Related({ d }: { d: Doc }) {
 function Access({ d, admin }: { d: Doc; admin: boolean }) {
   const s = useStore();
   const L = lists(s);
-  const { save, logAudit, toast } = useStore.getState();
-  const setVis = (v: string) => { void save("documents", { ...d, visibility: v }); logAudit("Changed access", `${d.title} → ${v}`); toast("Access changed to " + v); };
+  const { save, toast } = useStore.getState();
+  const setVis = (v: string) => { void save("documents", { ...d, visibility: v }); toast("Access changed to " + v); };
   return (
     <div className="grid2">
       <div className="card"><div className="card-h"><h3>Who can see this document</h3></div>

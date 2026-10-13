@@ -122,6 +122,10 @@ Inputs: the person's role, the role → visibility matrix from settings, their d
 
 ### Phase 0 — Foundation (2–3 weeks) · *do first; everything depends on it*
 
+**Progress:** 0.2 done (`app/policy.py`, `tests/test_policy.py`); 0.5 done; 0.4 partly (the server
+rejects status changes by non-approvers and writes the audit log, but dedicated transition endpoints
+are still to come); 0.6 partly (chats and bookmarks are private; collections record their owner).
+
 | Step | Work | Done when |
 |---|---|---|
 | 0.1 | Add **Alembic**; create the tables above; a one-off migration that moves today's `records` data into them | Data visible through the new tables; `alembic upgrade head` rebuilds an empty database |

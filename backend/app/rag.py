@@ -9,6 +9,7 @@ from sqlalchemy import Column, Integer, String, Table, Text, select, text
 from .config import settings
 from .database import engine, meta
 from .llm import chat, embed
+from .policy import ANSWERABLE
 
 blocks = Table(
     "blocks", meta,
@@ -24,7 +25,6 @@ with engine.begin() as _c:
     _c.execute(text("CREATE INDEX IF NOT EXISTS blocks_embedding_idx ON blocks USING hnsw (embedding vector_cosine_ops)"))
 
 # The assistant never answers from drafts, pending, rejected or withdrawn documents.
-ANSWERABLE = {"Active", "Superseded", "Expired"}
 LABELS = ["One source", "Multiple sources", "Revised policy", "Historical record",
           "Conflicting instructions", "Insufficient evidence", "Needs clarification"]
 LANGS = {"en": "English", "hi": "Hindi (Devanagari script)", "auto": "the same language as the question"}

@@ -9,7 +9,7 @@ import { Field } from "@/components/ui";
 export function EditMetaModal({ doc }: { doc: Doc }) {
   const s = useStore();
   const L = lists(s);
-  const { save, logAudit, closeModal, toast } = useStore.getState();
+  const { save, closeModal, toast } = useStore.getState();
   const [m, setM] = useState(doc);
   const set = (patch: Partial<Doc>) => setM((p) => ({ ...p, ...patch }));
   const toggleAud = (a: string) => set({ audience: m.audience.includes(a) ? m.audience.filter((x) => x !== a) : [...m.audience, a] });
@@ -17,7 +17,7 @@ export function EditMetaModal({ doc }: { doc: Doc }) {
     const last = m.versions[m.versions.length - 1];
     const versions = [...m.versions, { v: (parseFloat(last.v) + 0.1).toFixed(1), date: todayIso(), by: me(s).name, note: "Metadata edited" }];
     void save("documents", { ...m, versions });
-    logAudit("Edited", m.title); closeModal(); toast("Metadata saved");
+    closeModal(); toast("Metadata saved");
   };
   return (
     <>
@@ -50,7 +50,7 @@ export function EditMetaModal({ doc }: { doc: Doc }) {
 
 export function WithdrawModal({ doc }: { doc: Doc }) {
   const s = useStore();
-  const { save, logAudit, closeModal, toast } = useStore.getState();
+  const { save, closeModal, toast } = useStore.getState();
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(todayIso());
   const submit = () => {
@@ -59,7 +59,7 @@ export function WithdrawModal({ doc }: { doc: Doc }) {
       ...doc, status: "Withdrawn", withdrawReason: reason,
       approvals: [...doc.approvals, { step: "Withdrawn", by: me(s).name, date, kind: "bad", note: reason }],
     });
-    logAudit("Withdrawn", doc.title); closeModal(); toast("Document withdrawn. It will no longer be used in answers.");
+    closeModal(); toast("Document withdrawn. It will no longer be used in answers.");
   };
   return (
     <>

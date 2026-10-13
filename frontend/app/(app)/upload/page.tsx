@@ -21,7 +21,7 @@ const REQUIRED: [keyof Meta, string][] = [
 export default function UploadPage() {
   const s = useStore();
   const L = lists(s);
-  const { save, logAudit, toast } = useStore.getState();
+  const { save, toast } = useStore.getState();
   const [queue, setQueue] = useState<Item[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const [over, setOver] = useState(false);
@@ -62,7 +62,6 @@ export default function UploadPage() {
       pages: it.pages, ...(it.ocr != null ? { ocr: it.ocr } : {}),
     };
     void save("documents", doc);
-    logAudit("Submitted", doc.title);
     update(it.id, { status: "submitted", docId: id });
     toast("Submitted for approval");
   }

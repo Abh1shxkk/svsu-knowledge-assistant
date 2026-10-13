@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { answerable, filterCount, scopeDocs, scopeLabel, useStore } from "@/lib/store";
+import { filterCount, scopeDocs, scopeLabel, useStore } from "@/lib/store";
 import type { Answer, Chat, Msg } from "@/lib/types";
 import { isHindi, nid } from "@/lib/util";
 import { Icon } from "@/components/icon";
@@ -65,7 +65,6 @@ function Ask() {
       const answer = await api.ask({
         question: q,
         scope_ids: scopeDocs(st).map((d) => d.id),
-        permitted_ids: answerable(st).map((d) => d.id),
         lang,
         // Earlier questions in this chat, so a follow-up like "and in 2023?" can be rewritten in full.
         history: chat.msgs.filter((m): m is Extract<Msg, { role: "user" }> => m.role === "user").map((m) => m.text).slice(0, -1),

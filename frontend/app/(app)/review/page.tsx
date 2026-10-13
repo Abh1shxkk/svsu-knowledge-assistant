@@ -10,7 +10,7 @@ import { Ft, Pill } from "@/components/ui";
 
 export default function ReviewPage() {
   const s = useStore();
-  const { save, logAudit, toast } = useStore.getState();
+  const { save, toast } = useStore.getState();
   const queue = s.documents.filter((d) => ["Pending", "Changes requested"].includes(d.status));
   const [selId, setSelId] = useState<string | null>(queue[0]?.id ?? null);
   const [comment, setComment] = useState("");
@@ -28,7 +28,7 @@ export default function ReviewPage() {
       next.status = "Active";
       next.approvals = [...d.approvals, { step: "Approved and published", by, date: todayIso(), kind: "ok", note: comment }];
       if (d.revisionOf) { const o = getDoc(s, d.revisionOf); if (o && o.status === "Active") void save("documents", { ...o, status: "Superseded", supersededBy: d.id }); }
-      logAudit("Approved", d.title); toast("Approved and published to the library");
+      toast("Approved and published to the library");
     } else if (v === "changes") {
       next.status = "Changes requested";
       next.approvals = [...d.approvals, { step: "Changes requested", by, date: todayIso(), kind: "warn", note: comment }];

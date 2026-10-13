@@ -7,9 +7,11 @@ search and cited answers from PostgreSQL + pgvector, light/dark themes — built
 Below is what still needs doing, most important first.
 
 ## 1. Must fix before real staff use it
-- [ ] **Server-side permissions.** The browser currently receives every document (including
-      "Management Only" and pending ones), and `/ask` trusts the browser's list of allowed documents.
-      The server must filter documents by the signed-in person's role.
+- [x] **Server-side permissions.** One access policy (`backend/app/policy.py`, 23 unit tests) now
+      filters everything the browser receives and everything `/ask` may cite; writes are checked per
+      role, chats/bookmarks are private, and the server writes the audit log.
+- [ ] **Real tables and paginated APIs** (Plan Phase 0.1, 0.3, 0.8) — `/records` still loads all of a
+      person's data at once; fine now, slow at thousands of documents.
 - [ ] **Keep the original files.** Uploads save only the extracted text. Store the original PDF / scan /
       image and let people view and download it.
 - [ ] **Remove sample data.** The 16 prototype documents, sample users ("Dr. Neha Sharma" etc.),

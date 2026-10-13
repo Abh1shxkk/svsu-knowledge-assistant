@@ -1,12 +1,14 @@
 """SVSU Knowledge Assistant API."""
 import json
+import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from fastapi import Body, Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import auth, extract, rag, store
+from . import auth, extract, policy, rag, store
 
 
 @asynccontextmanager
@@ -27,8 +29,7 @@ class Login(BaseModel):
 
 class Ask(BaseModel):
     question: str
-    scope_ids: list[str]       # documents the person chose to search
-    permitted_ids: list[str]   # every document the person may see
+    scope_ids: list[str]       # documents the person chose to search (narrowed to what they may see)
     lang: str = "auto"         # auto | en | hi
     history: list[str] = []    # earlier questions in this chat, so follow-ups can be rewritten
 
@@ -91,39 +92,53 @@ def reset_password(login_id: str, body: PasswordReset, admin: dict = Depends(aut
 
 @app.get("/records")
 def get_records(user: dict = Depends(auth.current_user)):
-    return store.all_records()
+    return policy.visible_records(user, store.all_records())
 
 
 @app.put("/records/{kind}/{id}")
-def put_record(kind: str, id: str, data: dict = Body(...),
-               user: dict = Depends(auth.require_role("Administrator", "Approver", "Uploader"))):
+def put_record(kind: str, id: str, data: dict = Body(...), user: dict = Depends(auth.current_user)):
     _check_kind(kind)
+    old = store.get(kind, id)
+    if err := policy.write_error(user, kind, data, old, _ctx()):
+        raise HTTPException(403, err)
+    if kind in policy.OWNED or kind == "collections":  # the server, not the browser, records the owner
+        data["owner"] = (old or {}).get("owner") or user["login_id"]
     if kind == "documents":
-        old = store.get(kind, id)
+        if old is None:
+            data["uploader_id"] = user["login_id"]
+        else:
+            data["uploader_id"] = old.get("uploader_id")
         if old is None or old.get("pages") != data.get("pages"):
             rag.index_document(data)  # index first: a failure saves nothing
     store.put(kind, id, data)
+    if action := _audit_action(kind, data, old):
+        _audit(user, *action)
     return {"ok": True}
 
 
 @app.delete("/records/{kind}/{id}")
-def delete_record(kind: str, id: str,
-                  user: dict = Depends(auth.require_role("Administrator", "Approver", "Uploader"))):
+def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
     _check_kind(kind)
-    if kind == "users":
-        rec = store.get(kind, id)
-        if rec and rec.get("login_id"):
-            store.delete_credential(str(rec["login_id"]))
+    old = store.get(kind, id)
+    if old is None:
+        raise HTTPException(404, "Not found")
+    if err := policy.write_error(user, kind, None, old, _ctx()):
+        raise HTTPException(403, err)
+    if kind == "users" and old.get("login_id"):
+        store.delete_credential(str(old["login_id"]))
     store.delete(kind, id)
     if kind == "documents":
         rag.remove_document(id)
+        _audit(user, "Deleted", old.get("title", id))
     return {"ok": True}
 
 
 @app.post("/ask")
 def ask(body: Ask, user: dict = Depends(auth.current_user)):
-    docs = {d["id"]: d for d in store.all_records()["documents"]}
-    return rag.answer(body.question, body.scope_ids, body.permitted_ids, docs, body.lang, body.history)
+    ctx = _ctx()
+    docs = {d["id"]: d for d in store.all_records()["documents"] if policy.can_answer(user, d, ctx)}
+    scope = [i for i in body.scope_ids if i in docs]  # never more than this person may see
+    return rag.answer(body.question, scope, list(docs), docs, body.lang, body.history)
 
 
 @app.post("/extract")
@@ -138,11 +153,45 @@ async def extract_file(file: UploadFile,
 
 
 @app.post("/documents/{doc_id}/deadlines")
-def find_deadlines(doc_id: str, user: dict = Depends(auth.current_user)):
+def find_deadlines(doc_id: str, user: dict = Depends(auth.require_role(*policy.UPLOADERS))):
     doc = store.get("documents", doc_id)
-    if not doc:
+    if not doc or not policy.can_view(user, doc, _ctx()):
         raise HTTPException(404, "Document not found")
     return extract.deadlines(doc)
+
+
+def _ctx() -> policy.Ctx:
+    return policy.Ctx.from_settings(store.all_records()["settings"])
+
+
+_STATUS_ACTION = {"Active": "Approved", "Rejected": "Rejected", "Changes requested": "Changes requested",
+                  "Withdrawn": "Withdrawn", "Superseded": "Superseded", "Pending": "Submitted"}
+
+
+def _audit_action(kind: str, new: dict, old: dict | None) -> tuple[str, str] | None:
+    """What changed, worded for the audit log — decided by the server from the data, not by the browser."""
+    if kind == "users":
+        return ("Added user" if old is None else "Updated user", new.get("name", new.get("id", "")))
+    if kind != "documents":
+        return None
+    title = new.get("title", "")
+    if old is None:
+        return "Submitted", title
+    if new.get("status") != old.get("status"):
+        restored = new.get("status") == "Active" and old.get("status") == "Withdrawn"
+        return ("Restored" if restored else _STATUS_ACTION.get(new["status"], "Changed status")), title
+    if new.get("visibility") != old.get("visibility"):
+        return "Changed access", f"{title} → {new.get('visibility')}"
+    return "Edited", title
+
+
+def _audit(user: dict, act: str, what: str) -> None:
+    now = datetime.now()
+    store.put("audit", uuid.uuid4().hex, {
+        "id": uuid.uuid4().hex, "t": now.strftime("%d %b %Y, %I:%M %p").lstrip("0"),
+        "at": now.isoformat(timespec="seconds"), "who": user.get("name") or user.get("login_id"),
+        "act": act, "what": what,
+    })
 
 
 def _check_kind(kind: str) -> None:

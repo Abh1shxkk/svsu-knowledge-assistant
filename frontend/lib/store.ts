@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { create } from "zustand";
 import { api, getToken, setToken, type SessionUser } from "./api";
 import type { AiSettings, Cite, Doc, Kind, Lists, Records } from "./types";
-import { initials, nid, nowStr } from "./util";
+import { initials, nid } from "./util";
 
 export type Viewer = {
   doc: string; page?: number; block?: string; quote?: string; zoom: number;
@@ -28,7 +28,6 @@ type State = Records & {
   logout: () => void;
   save: <K extends Kind>(kind: K, item: Records[K][number]) => Promise<void>;
   remove: (kind: Kind, id: string) => Promise<void>;
-  logAudit: (act: string, what: string) => void;
   toast: (msg: string) => void;
   openModal: (m: NonNullable<Modal>) => void;
   closeModal: () => void;
@@ -63,7 +62,6 @@ export const useStore = create<State>((set, get) => ({
     set({ [kind]: (get()[kind] as { id: string }[]).filter((x) => x.id !== id) } as Partial<State>);
     try { await api.remove(kind, id); } catch (e) { get().toast(`Couldn't delete: ${(e as Error).message}`); }
   },
-  logAudit: (act, what) => void get().save("audit", { id: nid("a"), t: nowStr(), who: me(get()).name, act, what }),
   toast: (msg) => {
     const id = nid("t");
     set({ toasts: [...get().toasts, { id, msg }] });

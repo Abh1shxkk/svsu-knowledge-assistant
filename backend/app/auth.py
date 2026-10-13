@@ -35,8 +35,11 @@ def verify(login_id: str, password: str) -> dict | None:
     if not hashed or not _check(password, hashed):
         return None
     rec = next((u for u in store.all_records()["users"] if str(u.get("login_id", "")) == login_id), None)
+    if rec and rec.get("active") is False:  # deactivated in Administration
+        return None
     return {"login_id": login_id, "employee_id": 0,
-            "name": rec["name"] if rec else login_id, "email": rec.get("email", "") if rec else ""}
+            "name": rec["name"] if rec else login_id, "email": rec.get("email", "") if rec else "",
+            "dept": rec.get("dept", "") if rec else ""}
 
 
 def app_role(login_id: str) -> str:
