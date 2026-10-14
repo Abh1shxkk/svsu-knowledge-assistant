@@ -24,9 +24,12 @@ STYLES = ["a clear question in English",
           "an informal question in Hinglish (Hindi typed in English letters), as staff type on a phone",
           "a question in Hindi (Devanagari)"]
 _WRITE = ("You write test questions for a search assistant over Swami Vivekanand Subharti University documents. "
-          "From the passage, write ONE question a staff member might really ask whose answer is in the passage, "
-          "and the short correct answer. Write the question as {style}. Don't copy the passage's sentences or "
-          "mention 'the passage' or 'the document'. Reply as JSON {{\"question\": \"...\", \"answer\": \"...\"}}.")
+          "From the passage, write ONE question a staff member might really ask, with one clear, specific answer "
+          "stated in the passage, and that short correct answer. Ask about what the document is for (rules, "
+          "dates, schedules, amounts, people's duties), never about letterheads, addresses, phone numbers or "
+          "page footers, and make the question unambiguous on its own. Write it as {style}. Don't copy the "
+          "passage's sentences or mention 'the passage' or 'the document'. If the passage has nothing suitable, "
+          "reply with empty strings. Reply as JSON {{\"question\": \"...\", \"answer\": \"...\"}}.")
 _JUDGE = ("You check a search assistant. Given a question, the expected answer and the assistant's answer, decide "
           "whether the assistant's answer gives the expected facts correctly (wording, language and extra detail "
           "may differ; a wrong or missing date, number, name or code is incorrect; saying it cannot find the "
@@ -58,11 +61,22 @@ def make_set(n: int) -> list[dict]:
     for i, r in enumerate(picked):
         style = STYLES[i % len(STYLES)]
         res = chat(_WRITE.format(style=style), r["text"][:3000], as_json=True, model=settings.fast_model)
-        if isinstance(res.get("question"), str) and isinstance(res.get("answer"), str):
+        if isinstance(res.get("question"), str) and isinstance(res.get("answer"), str) and res["question"].strip():
             items.append({**{k: r[k] for k in ("doc_id", "page", "block")}, "question": res["question"],
                           "answer": res["answer"], "style": style.split(" (")[0]})
     store.put("eval", "set", {"id": "set", "made": datetime.now().isoformat(timespec="seconds"), "items": items})
     return items
+
+
+def _flat(body: list[dict]) -> str:
+    """The whole answer as text for the judge: paragraphs, lists and tables alike."""
+    out = []
+    for part in body:
+        out += [part[k] for k in ("p", "sub") if part.get(k)]
+        out += part.get("ul") or []
+        if t := part.get("table"):
+            out += [" | ".join(t.get("head") or [])] + [" | ".join(r) for r in t.get("rows") or []]
+    return "\n".join(map(str, out))
 
 
 def run(n: int = 50, new: bool = False) -> dict:
@@ -78,12 +92,12 @@ def run(n: int = 50, new: bool = False) -> dict:
         hits = rag._search_all(embed(queries), list(docs), top_k, rag.exact_terms(queries))
         found = any((h["doc_id"], h["page"], h["block"]) == (it["doc_id"], it["page"], it["block"]) for h in hits)
         answer = rag._generate(it["question"], hits, docs, "auto") if hits else dict(rag._INSUFFICIENT)
-        said = " ".join(str(p.get("p") or p.get("sub") or " ".join(map(str, p.get("ul") or [])) or "") for p in answer["body"])
+        said = _flat(answer["body"])
         verdict = chat(_JUDGE, f"Question: {it['question']}\nExpected answer: {it['answer']}\nAssistant's answer: {said}",
                        as_json=True, model=settings.fast_model, temperature=0)
         results.append({**it, "found": found, "doc_found": any(h["doc_id"] == it["doc_id"] for h in hits),
                         "cited": any(c["doc"] == it["doc_id"] for c in answer.get("cites", [])),
-                        "correct": verdict.get("correct") is True, "got": said[:400]})
+                        "correct": verdict.get("correct") is True, "got": said[:600]})
     pct = lambda key: round(100 * sum(r[key] for r in results) / len(results)) if results else 0  # noqa: E731
     by_style = {s: round(100 * sum(r["correct"] for r in rs) / len(rs)) for s in {r["style"] for r in results}
                 if (rs := [r for r in results if r["style"] == s])}

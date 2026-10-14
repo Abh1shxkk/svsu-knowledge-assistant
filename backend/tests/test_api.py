@@ -367,3 +367,9 @@ def test_quality_report_from_generated_questions(client, people, admin):
     assert client.get("/reports/quality", headers=ap).json()["latest"]["id"] == summary["id"]
     assert client.post("/reports/quality/run", headers=ap).status_code == 403   # administrators start a run
     assert client.post("/reports/quality/run", headers=admin).status_code == 200
+
+
+def test_quality_judge_reads_tables_and_lists():
+    from app.evaluate import _flat
+    body = [{"p": "Schedule:"}, {"ul": ["Item one"]}, {"table": {"head": ["Date", "Subject"], "rows": [["14/10/2026", "Cataloguing"]]}}]
+    assert _flat(body).split(chr(10)) == ["Schedule:", "Item one", "Date | Subject", "14/10/2026 | Cataloguing"]
