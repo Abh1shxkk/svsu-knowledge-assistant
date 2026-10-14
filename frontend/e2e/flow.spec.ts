@@ -64,6 +64,12 @@ test("upload, review and publish across roles", async ({ page }) => {
     buffer: Buffer.from(`Subject: Invigilation duty ${stamp}\n\nAll invigilators shall report 45 minutes before the examination.\n\nMobile phones are not allowed in examination halls.`),
   });
   await expect(page.locator("#u-title")).toBeVisible({ timeout: 90_000 });
+  // The uploader checks the text the assistant will search and corrects it.
+  await page.getByRole("button", { name: "Edit text" }).click();
+  const box = page.getByLabel("Document text");
+  await box.fill((await box.inputValue()) + "\n\nChecked and corrected by the uploader.");
+  await page.getByRole("button", { name: "Save text" }).click();
+  await expect(page.locator(".exttext").first()).toContainText("Checked and corrected by the uploader.");
   await page.locator("#u-title").fill(TITLE);
   await page.locator("#u-ref").fill(`SVSU/E2E/${stamp}`);
   for (const id of ["#u-type", "#u-authority", "#u-dept"]) await page.locator(id).selectOption({ index: 1 });
@@ -106,6 +112,7 @@ test("upload, review and publish across roles", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Withdraw" })).toHaveCount(0);
   await page.getByRole("tab", { name: "Preview" }).click();
   await expect(page.locator(".paper").first()).toContainText("45 minutes");
+  await expect(page.locator(".paper").first()).toContainText("Checked and corrected by the uploader.");
   await expect(page.locator(".wm")).toHaveCount(0);  // no SAMPLE watermark on real documents
 
   // The Uploader can no longer edit it once published.

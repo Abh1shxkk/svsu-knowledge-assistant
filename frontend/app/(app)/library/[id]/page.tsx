@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isAdmin, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages, docText } from "@/components/paper";
 import { DownloadOriginal, OriginalFile, OriginalPages, previewable } from "@/components/original";
+import { TextReview } from "@/components/text-review";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Note, Pill, Tabs, DateBox, Due } from "@/components/ui";
@@ -89,7 +90,12 @@ export default function DocDetail() {
         <>
           <div className="row between"><p className="sm muted">{d.fileType === "scan" ? `Text from the OCR layer (${d.ocr}% confidence). Check against the scan before relying on figures.` : "Text extracted from the file. This is what the assistant searches."}</p>
             <button className="btn sm" disabled={!full} onClick={() => { if (full) { navigator.clipboard?.writeText(docText(full)); toast("Copied"); } }} type="button"><Icon n="copy" s /> Copy text</button></div>
-          <div className="exttext" lang={d.lang}>{full ? docText(full) : "Loading…"}</div>
+          {full?.pages ? (
+            <TextReview pages={full.pages} unsure={d.unsure} lang={d.lang} editable={editable} onSave={async (pages) => {
+              const versions = [...d.versions, { v: (parseFloat(d.versions[d.versions.length - 1]?.v ?? "1.0") + 0.1).toFixed(1), date: todayIso(), by: me(s).name, note: "Text corrected" }];
+              if (await save("documents", { ...d, pages, unsure: [], versions })) toast("Text saved. The assistant now searches the corrected text.");
+            }} />
+          ) : <div className="exttext">Loading…</div>}
         </>
       )}
       {tab === "approvals" && (

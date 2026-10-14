@@ -4,7 +4,8 @@ answered with citations. No OCR or re-reading of files happens at search time.""
 import json
 import re
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Integer, String, Table, Text, select, text
+from datetime import date
+from sqlalchemy import Column, Integer, String, Table, Text, case, literal, select, text
 
 from .config import settings
 from .database import engine, meta
@@ -27,7 +28,9 @@ with engine.begin() as _c:
 # The assistant never answers from drafts, pending, rejected or withdrawn documents.
 LABELS = ["One source", "Multiple sources", "Revised policy", "Historical record",
           "Conflicting instructions", "Insufficient evidence", "Needs clarification"]
-LANGS = {"en": "English", "hi": "Hindi (Devanagari script)", "auto": "the same language as the question"}
+LANGS = {"en": "English", "hi": "Hindi (Devanagari script)",
+         "auto": "the same language and script as the question (Hindi typed in English letters, "
+                 "i.e. Hinglish, gets a simple Hinglish answer in English letters)"}
 BODY_FORMAT = (
     '"body" is a list of blocks: {"p": "paragraph"}, {"ul": ["item", ...]}, '
     '{"table": {"head": ["column", ...], "rows": [["cell", ...], ...]}}, {"sub": "small note"}, '
@@ -48,6 +51,10 @@ _SYSTEM = (
     "clarification and offer 3 to 5 specific questions in an opts block. Never use outside knowledge. "
     "Never say 'excerpts'; call them documents or records. Write the answer in {lang}."
 )
+
+
+def _today() -> str:
+    return f"{date.today():%d %B %Y} ({date.today():%d/%m/%Y})"
 
 
 def block_text(b: dict) -> str:
@@ -100,7 +107,9 @@ _REWRITE = (
     "Write 2 or 3 short, self-contained search queries: one in English, one in Hindi (Devanagari), and one "
     "more only if the question has a second part. Expand abbreviations and informal wording (CL = casual "
     "leave, EL = earned leave, kitne = how many). If it is a follow-up, use the earlier questions to say "
-    "what it refers to. Keep names, dates and reference numbers exactly. Do not answer the question. "
+    "what it refers to. Keep names, dates, codes and reference numbers exactly, and also write any date as "
+    "DD/MM/YYYY (documents write dates that way); use today's date for words like today, now or next. "
+    "Do not answer the question. "
     'Reply as JSON {"queries": ["...", "..."]}.'
 )
 
@@ -108,7 +117,8 @@ _REWRITE = (
 def rewrite(question: str, history: list[str]) -> list[str]:
     """The LLM only rewrites the question for search; the search itself is semantic (pgvector)."""
     earlier = "\n".join(f"- {h}" for h in history[-3:])
-    res = chat(_REWRITE, (f"Earlier questions:\n{earlier}\n\n" if earlier else "") + f"Question: {question}",
+    res = chat(_REWRITE, f"Today: {_today()}\n" + (f"Earlier questions:\n{earlier}\n\n" if earlier else "")
+               + f"Question: {question}",
                as_json=True, model=settings.fast_model)
     queries = [q.strip() for q in res.get("queries") or [] if isinstance(q, str) and q.strip()][:3]
     return list(dict.fromkeys([question, *queries]))  # the person's own words are always searched too
@@ -116,17 +126,49 @@ def rewrite(question: str, history: list[str]) -> list[str]:
 
 _PER_DOC = 3  # so one long document can't crowd out the others (e.g. old vs new rules)
 
+# Codes, reference numbers and dates: meaning-based search can miss these, so they are also matched exactly.
+_EXACT = re.compile(r"[A-Za-z0-9]+(?:[-/.][A-Za-z0-9]+)+|[A-Za-z]*\d[A-Za-z0-9]*|\b[A-Z]{2,}\b")
 
-def _search_all(vectors: list[list[float]], ids: list[str], limit: int) -> list[dict]:
-    """Search with every query, keep each paragraph's best match, and cap paragraphs per document."""
+
+def exact_terms(queries: list[str]) -> list[str]:
+    terms = {t for q in queries for t in _EXACT.findall(q)
+             if len(t) >= 3 and not (t.isdigit() and len(t) <= 4)}  # bare numbers like 12 or 2026 match everything
+    return sorted(terms)[:8]
+
+
+def _like(t: str) -> str:
+    return "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def _keyword(terms: list[str], ids: list[str], limit: int) -> list[dict]:
+    """Paragraphs containing the exact terms (any case), the most terms first."""
+    if not terms or not ids:
+        return []
+    found = sum((case((blocks.c.text.ilike(_like(t)), 1), else_=0) for t in terms), literal(0))
+    q = (select(blocks.c.doc_id, blocks.c.page, blocks.c.block, blocks.c.text, found.label("found"))
+         .where(blocks.c.doc_id.in_(ids), found > 0).order_by(found.desc()).limit(limit))
+    with engine.connect() as c:
+        return [dict(r._mapping) for r in c.execute(q)]
+
+
+def _search_all(vectors: list[list[float]], ids: list[str], limit: int, terms: list[str] = ()) -> list[dict]:
+    """Meaning-based search with every query plus exact matches of codes and dates, merged by rank
+    (reciprocal rank fusion), with a cap on paragraphs per document."""
     best: dict[tuple, dict] = {}
     for v in vectors:
         for h in _search(v, ids, limit * 3):
             key = (h["doc_id"], h["page"], h["block"])
             if key not in best or h["score"] > best[key]["score"]:
                 best[key] = h
+    rank: dict[tuple, float] = {}
+    for r, h in enumerate(sorted(best.values(), key=lambda h: -h["score"])):
+        rank[(h["doc_id"], h["page"], h["block"])] = 1 / (60 + r)
+    for r, h in enumerate(_keyword(list(terms), ids, limit * 3)):
+        key = (h["doc_id"], h["page"], h["block"])
+        rank[key] = rank.get(key, 0) + 1 / (60 + r)
+        best.setdefault(key, {**{k: h[k] for k in ("doc_id", "page", "block", "text")}, "score": 0.0})
     picked, per_doc = [], {}
-    for h in sorted(best.values(), key=lambda h: -h["score"]):
+    for h in sorted(best.values(), key=lambda h: -rank[(h["doc_id"], h["page"], h["block"])]):
         if per_doc.get(h["doc_id"], 0) < _PER_DOC:
             picked.append(h)
             per_doc[h["doc_id"]] = per_doc.get(h["doc_id"], 0) + 1
@@ -154,12 +196,13 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     queries = rewrite(question, list(history))
     vectors = embed(queries)
     ai = ai or {}
-    hits = _search_all(vectors, usable(scope_ids), int(ai.get("maxSources") or settings.top_k))
+    terms = exact_terms(queries)
+    hits = _search_all(vectors, usable(scope_ids), int(ai.get("maxSources") or settings.top_k), terms)
     result = _generate(question, hits, docs, lang, ai.get("histOnly", True) is not False) if hits else dict(_INSUFFICIENT)
     result["queries"] = queries[1:] or queries
     if result["label"] == "Insufficient evidence" and set(scope_ids) != set(permitted_ids):
         # Nothing in scope, but maybe in documents the person narrowed away: say which.
-        outside = {h["doc_id"] for h in _search_all(vectors, usable(permitted_ids), 5)
+        outside = {h["doc_id"] for h in _search_all(vectors, usable(permitted_ids), 5, terms)
                    if h["score"] >= 0.4} - set(scope_ids)
         if outside:
             return {
@@ -217,7 +260,8 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
     system = _SYSTEM.replace("{lang}", LANGS.get(lang, LANGS["auto"])).replace("{history_rule}", _HISTORY_RULES[hist_only])
     res = chat(system,
                "Excerpts:\n" + "\n\n".join(excerpt(n, h) for n, h in enumerate(hits, 1))
-               + f"\n\nQuestion: {question}", as_json=True)
+               + f"\n\nToday's date: {_today()} (anything dated earlier has already happened)."
+               + f"\nQuestion: {question}", as_json=True)
     # The model's own list of the excerpts it used (numbers may arrive as text).
     listed = {int(c["excerpt"]): c.get("quote") for c in res.get("cites") or []
               if isinstance(c, dict) and str(c.get("excerpt", "")).strip().isdigit() and 1 <= int(c["excerpt"]) <= len(hits)}

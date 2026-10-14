@@ -13,6 +13,8 @@ export type Doc = {
   pages?: Block[][]; ocr?: number; sample?: boolean; uploader_id?: string;
   /** The original uploaded file (older documents may not have one). */
   file?: { key: string; name: string; mime: string; pages?: number };
+  /** Words OCR read with low confidence, shown underlined so people check them. */
+  unsure?: string[];
 };
 
 /** owner is the creator's Login ID (set by the server); ownerName is shown. */

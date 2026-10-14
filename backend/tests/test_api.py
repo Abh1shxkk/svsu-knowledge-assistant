@@ -222,7 +222,7 @@ def test_word_tables_are_read_row_by_row():
     from docx import Document
     from app import extract
     d = Document()
-    d.add_paragraph("Exam schedule.")
+    d.add_paragraph("Exam schedule for the first semester.")
     t = d.add_table(rows=3, cols=3)
     for r, row in enumerate(ROWS):
         for c, v in enumerate(row):
@@ -230,7 +230,7 @@ def test_word_tables_are_read_row_by_row():
     buf = io.BytesIO()
     d.save(buf)
     texts = [b["text"] for p in extract.extract("t.docx", buf.getvalue())["pages"] for b in p]
-    assert texts == ["Exam schedule.", WANT]  # tables used to be skipped entirely
+    assert texts == ["Exam schedule for the first semester.", WANT]  # tables used to be skipped entirely
 
 
 def test_pdf_tables_are_read_row_by_row_even_when_written_column_by_column():
@@ -238,7 +238,7 @@ def test_pdf_tables_are_read_row_by_row_even_when_written_column_by_column():
     from app import extract
     pdf = pymupdf.open()
     page = pdf.new_page()
-    page.insert_text((50, 60), "Exam schedule.")
+    page.insert_text((50, 60), "Exam schedule for the first semester.")
     xs, y0, rh = [50, 170, 360, 480], 90, 24
     for col in range(3):
         for r, row in enumerate(ROWS):
@@ -248,7 +248,7 @@ def test_pdf_tables_are_read_row_by_row_even_when_written_column_by_column():
     for x in xs:
         page.draw_line((x, y0), (x, y0 + 3 * rh))
     texts = [b["text"] for p in extract.extract("t.pdf", pdf.tobytes())["pages"] for b in p]
-    assert texts == ["Exam schedule.", WANT]
+    assert texts == ["Exam schedule for the first semester.", WANT]
 
 
 def test_deleting_a_chat_removes_bookmarks_of_its_answers(client, people):
@@ -306,3 +306,29 @@ def test_answer_text_is_always_plain_strings(monkeypatch):
     assert res["follow"] == ["When do exams end?", "Where?"]
     assert res["body"] == [{"p": "Plain {1}"}, {"ul": ["First", "Second"]}, {"table": {"head": ["A", "1"], "rows": [["x", "2"]]}}]
     assert res["banner"] == {"kind": "revised", "text": "Changed."}
+
+
+def test_tiny_fragments_join_the_next_paragraph():
+    from app import extract
+    text = "NOTICE\n\nARTI\n\nThe first sessional test will be held as per the following schedule.\n\nHead"
+    texts = [b["text"] for p in extract.extract("n.txt", text.encode())["pages"] for b in p]
+    assert texts == ["NOTICE\nARTI\nThe first sessional test will be held as per the following schedule.\nHead"]
+
+
+def test_exact_codes_find_the_right_paragraph(client, people):
+    """Meaning-based search alone can miss codes; the exact match brings the right document first."""
+    ap, v = people["Approver"], people["Viewer"]
+    other = [[{"id": "b1", "text": "General guidance for invigilators during examinations.", "kind": "p"}]]
+    coded = [[{"id": "b1", "text": "MLIS-104 Information Sources and Systems is held at 09:00 AM.", "kind": "p"}]]
+    assert put(client, ap, "documents", doc("EX1", status="Active", pages=other)).status_code == 200
+    assert put(client, ap, "documents", doc("EX2", status="Active", pages=coded)).status_code == 200
+    r = client.post("/ask", headers=v, json={"question": "When is MLIS-104?", "scope_ids": ["EX1", "EX2"]}).json()
+    assert r["cites"][0]["doc"] == "EX2"
+
+
+def test_corrected_text_must_be_well_formed(client, people):
+    up = people["Uploader"]
+    for bad in ("text", [["b1"]], [[{"id": "b1", "text": "a"}, {"id": "b1", "text": "b"}]], [[{"id": "b1", "text": 5}]]):
+        assert put(client, up, "documents", doc("BAD1", pages=bad)).status_code == 400, bad
+    fixed = [[{"id": "b1", "text": "Corrected OCR text.", "kind": "p"}]]
+    assert put(client, up, "documents", doc("BAD1", pages=fixed)).status_code == 200

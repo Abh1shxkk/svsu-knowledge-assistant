@@ -64,7 +64,7 @@ function Ask() {
     await save("chats", chat);
 
     const st = useStore.getState();
-    const lang = st.ansLang === "auto" ? (isHindi(q) ? "hi" : "en") : st.ansLang;
+    const lang = st.ansLang;  // "auto": answer in the question's own language, Hinglish included
     try {
       const answer = await api.ask({
         question: q,

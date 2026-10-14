@@ -18,8 +18,11 @@ os.environ["TESSDATA_PREFIX"] = settings.tessdata_dir  # language files (eng, hi
 _LANG = {"Devanagari": "hin", "Latin": "eng"}
 
 
-def read(image: bytes) -> tuple[str, int, str]:
-    """-> (text, confidence 0-100, engine) for one page image."""
+UNSURE = 60  # words Tesseract is less sure of than this are shown to the uploader to check
+
+
+def read(image: bytes) -> tuple[str, int, str, list[str]]:
+    """-> (text, confidence 0-100, engine, words read with low confidence) for one page image."""
     img = Image.open(io.BytesIO(image)).convert("RGB")
     if lang := _LANG.get(_script(img)):
         return _tesseract(img, lang)
@@ -38,7 +41,7 @@ def _script(img: Image.Image) -> str:
         return ""
 
 
-def _tesseract(img: Image.Image, lang: str) -> tuple[str, int, str]:
+def _tesseract(img: Image.Image, lang: str) -> tuple[str, int, str, list[str]]:
     """Rebuild the page from where each word sits, not from Tesseract's own blocks: Tesseract reads a
     table column by column, which separates every date from its subject. Words on the same line of the
     page become one line (table cells joined with " | "), and a large vertical gap starts a paragraph."""
@@ -46,8 +49,10 @@ def _tesseract(img: Image.Image, lang: str) -> tuple[str, int, str]:
     words = [(d["left"][i], d["top"][i], d["width"][i], d["height"][i], w.strip())
              for i, w in enumerate(d["text"]) if w.strip()]
     confs = [float(c) for c, w in zip(d["conf"], d["text"]) if w.strip() and float(c) >= 0]
+    unsure = sorted({w.strip() for c, w in zip(d["conf"], d["text"])
+                     if 0 <= float(c) < UNSURE and sum(ch.isalnum() for ch in w) >= 2})
     if not words:
-        return "", 0, "tesseract"
+        return "", 0, "tesseract", []
     h = statistics.median(w[3] for w in words)  # typical word height: the yardstick for gaps
     rows: list[dict] = []
     for w in sorted(words, key=lambda w: w[1] + w[3] / 2):
@@ -69,4 +74,4 @@ def _tesseract(img: Image.Image, lang: str) -> tuple[str, int, str]:
             lines.append("")
         lines.append(line)
         prev_bottom = row["bottom"]
-    return "\n".join(lines), round(sum(confs) / len(confs)) if confs else 0, "tesseract"
+    return "\n".join(lines), round(sum(confs) / len(confs)) if confs else 0, "tesseract", unsure

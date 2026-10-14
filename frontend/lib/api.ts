@@ -37,6 +37,7 @@ export type Extracted = {
   kind: FileKind; pages: Block[][]; ocr: number | null; ocr_engine: string | null; suggestion: Record<string, unknown>;
   duplicate: { id: string; title: string; ref: string; status: string } | null;
   file: { key: string; name: string; mime: string; pages?: number };
+  unsure?: string[];
 };
 
 export type SessionUser = { login_id: string; name: string; email: string; role: string; dept?: string; dev?: boolean; employee_id?: number };

@@ -765,3 +765,5 @@ h1,h2,h3,h4{letter-spacing:-.02em}
   .viewer{position:fixed;inset:0;width:100%;max-width:none;border-radius:0;border:0;z-index:80}
 }
 .card-b .orig-img{max-width:100%}
+.exttext-edit{font-family:var(--f-mono);font-size:13px;line-height:1.6;min-height:420px;resize:vertical;white-space:pre-wrap}
+.exttext .lowconf{text-decoration:underline wavy var(--red);text-underline-offset:3px}

@@ -7,6 +7,7 @@ import { canApprove, lists, me, useStore } from "@/lib/store";
 import { blockText, isHindi, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Field } from "@/components/ui";
+import { TextReview } from "@/components/text-review";
 import type { Block, Doc, FileKind } from "@/lib/types";
 
 type Meta = Partial<Pick<Doc, "title" | "ref" | "type" | "authority" | "dept" | "institution" | "date" | "effective" | "expiry" | "audience" | "tags" | "visibility" | "description" | "related">>
@@ -14,7 +15,7 @@ type Meta = Partial<Pick<Doc, "title" | "ref" | "type" | "authority" | "dept" | 
 type Item = {
   id: string; name: string; kind: FileKind; pages: Block[][]; ocr?: number | null; ocrEngine?: string | null; meta: Meta;
   status: "processing" | "ready" | "submitted" | "draft"; docId?: string; errors: Record<string, string>; dup?: Extracted["duplicate"];
-  file?: Extracted["file"];
+  file?: Extracted["file"]; unsure?: string[];
 };
 
 const REQUIRED: [keyof Meta, string][] = [
@@ -44,7 +45,7 @@ export default function UploadPage() {
       setQueue((q) => [...q, item]); setSelId((cur) => cur ?? id);
       try {
         const res = await api.extract(file);
-        update(id, { kind: res.kind, pages: res.pages, ocr: res.ocr, ocrEngine: res.ocr_engine, status: "ready", dup: res.duplicate, file: res.file, meta: { institution: L.INSTS[0], ...(res.suggestion as Meta) } });
+        update(id, { kind: res.kind, pages: res.pages, ocr: res.ocr, ocrEngine: res.ocr_engine, status: "ready", dup: res.duplicate, file: res.file, unsure: res.unsure, meta: { institution: L.INSTS[0], ...(res.suggestion as Meta) } });
       } catch (e) { toast((e as Error).message); setQueue((q) => q.filter((x) => x.id !== id)); }
     }
   }
@@ -73,7 +74,7 @@ export default function UploadPage() {
       related: m.related ?? [], revisionOf: m.revRel && m.revRel !== "new" ? m.revDoc ?? null : null, supersededBy: null,
       versions: [{ v: "1.0", date: todayIso(), by, note: "Original upload" }],
       approvals: [{ step: draft ? "Saved as draft" : "Submitted for approval", by, date: todayIso(), kind: "", note: "Uploaded from " + it.name }],
-      pages: it.pages, file: it.file, ...(it.ocr != null ? { ocr: it.ocr } : {}),
+      pages: it.pages, file: it.file, unsure: it.unsure, ...(it.ocr != null ? { ocr: it.ocr } : {}),
     };
     if (!await save("documents", doc)) return;
     update(it.id, { status: draft ? "draft" : "submitted", docId: id });
@@ -161,8 +162,10 @@ export default function UploadPage() {
                       <button type="button" className="btn sm ghost" onClick={() => update(sel.id, { dup: null })}>It&apos;s a different document</button>
                     </div></div></div>
                 )}
-                <div className="sec" style={{ border: 0, padding: 0 }}><h4>Extracted text (what the assistant will search)</h4>
-                  <div className="prevbox"><pre>{sel.pages.flat().map((b) => blockText(b.text)).join("\n").slice(0, 1200) || "No text could be read from this file."}</pre></div></div>
+                <div className="sec" style={{ border: 0, padding: 0 }}><h4>Extracted text <small>What the assistant will search. Check it, and correct any mistakes.</small></h4>
+                  {sel.pages.length
+                    ? <TextReview pages={sel.pages} unsure={sel.unsure} editable onSave={(pages) => { update(sel.id, { pages, unsure: [] }); toast("Text updated"); }} />
+                    : <p className="sm muted">No text could be read from this file.</p>}</div>
                 <div className="sec"><h4>Document details</h4>
                   {fld(sel, "title", "Document title", true)}
                   <div className="grid2">{fld(sel, "ref", "Reference / letter number", true)}{fld(sel, "type", "Document type", true)}{fld(sel, "authority", "Issuing authority", true)}{fld(sel, "dept", "Issuing department", true)}</div>

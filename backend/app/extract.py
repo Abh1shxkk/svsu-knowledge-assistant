@@ -21,6 +21,7 @@ _KINDS = {".pdf": "pdf", ".docx": "docx", ".xlsx": "xlsx", ".csv": "xlsx", ".txt
           ".png": "img", ".jpg": "img", ".jpeg": "img", ".webp": "img"}
 _PER_PAGE = 12  # paragraphs per page when the file has no pages of its own
 _MAX_OCR_PAGES = 10
+_FRAGMENT = 25  # characters: shorter paragraphs are joined to their neighbour
 
 
 def extract(filename: str, raw: bytes) -> dict:
@@ -33,13 +34,13 @@ def extract(filename: str, raw: bytes) -> dict:
     if not kind:
         raise ValueError(f"{suffix or 'This'} files aren't supported. Use PDF, Word (.docx), Excel (.xlsx), "
                          "CSV, an image or a text file.")
-    scans: list[tuple[str, int, str]] = []  # OCR results, one per page image
+    scans: list[tuple[str, int, str, list[str]]] = []  # OCR results, one per page image
     if kind == "pdf":
         pdf = pymupdf.open(stream=raw, filetype="pdf")
         pages = [_pdf_page(p) for p in pdf]
         if sum(map(len, pages)) == 0:  # no text layer: a scan, so OCR the page images
             scans = [ocr.read(p.get_pixmap(dpi=300).tobytes("png")) for p in list(pdf)[:_MAX_OCR_PAGES]]
-            kind, pages = "scan", [_paras(t, keep_lines=True) for t, _, _ in scans]
+            kind, pages = "scan", [_paras(t, keep_lines=True) for t, *_ in scans]
     elif kind == "docx":
         pages = _paginate(_docx(raw))
     elif kind == "xlsx":
@@ -51,8 +52,9 @@ def extract(filename: str, raw: bytes) -> dict:
         pages = _paginate(_paras(raw.decode("utf-8", "ignore")))
     return {
         "kind": kind, "pages": _blocks(pages),
-        "ocr": round(sum(c for _, c, _ in scans) / len(scans)) if scans else None,
-        "ocr_engine": "+".join(sorted({e for _, _, e in scans})) or None,
+        "ocr": round(sum(s[1] for s in scans) / len(scans)) if scans else None,
+        "ocr_engine": "+".join(sorted({s[2] for s in scans})) or None,
+        "unsure": sorted({w for s in scans for w in s[3]})[:300],  # for the uploader to check
     }
 
 
@@ -127,10 +129,30 @@ def _rows(raw: bytes, suffix: str) -> list[list[str]]:
     return [[("" if v is None else str(v)) for v in row] for row in rows if any(v not in (None, "") for v in row)]
 
 
+def _join_fragments(page: list) -> list:
+    """Tiny pieces of text (a stray OCR word, a one-word heading) get no useful search match alone and
+    crowd out real paragraphs: attach each to the paragraph that follows it (or, at the end, precedes it)."""
+    out, carry = [], []
+    for p in page:
+        if isinstance(p, str) and len(p.strip()) < _FRAGMENT:
+            carry.append(p.strip())
+            continue
+        if carry and isinstance(p, str):
+            p = "\n".join([*carry, p])
+            carry = []
+        out.append(p)
+    if carry:
+        if out and isinstance(out[-1], str):
+            out[-1] += "\n" + "\n".join(carry)
+        else:
+            out.append("\n".join(carry))
+    return out
+
+
 def _blocks(pages: list[list]) -> list[list[dict]]:
     """Give every paragraph (or sheet row) an id that is unique within the document."""
     n, out = 0, []
-    for page in pages:
+    for page in map(_join_fragments, pages):
         blocks = []
         for text in page:
             n += 1

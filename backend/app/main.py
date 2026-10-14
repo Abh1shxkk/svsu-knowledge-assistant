@@ -203,6 +203,8 @@ def put_record(kind: str, id: str, data: dict = Body(...), user: dict = Depends(
         hidden = [i for i in old.get("docs", []) if (d := store.get("documents", i)) and not policy.can_view(user, d, ctx)]
         data["docs"] = list(dict.fromkeys([*data.get("docs", []), *hidden]))
     if kind == "documents":
+        if "pages" in data and not _valid_pages(data["pages"]):  # e.g. text corrected in the browser
+            raise HTTPException(400, "The document text isn't in the expected form.")
         data["uploader_id"] = old.get("uploader_id") if old else user["login_id"]
         if old and "pages" not in data:  # metadata edits from lists that don't carry the text
             data["pages"] = old.get("pages", [])
@@ -462,6 +464,17 @@ def _ctx() -> policy.Ctx:
 
 def _setting(id: str) -> dict:
     return store.get("settings", id) or {}
+
+
+def _valid_pages(pages) -> bool:
+    """Pages of blocks, each with a unique id and text (a string, or a list of cells for sheet rows)."""
+    if not isinstance(pages, list) or not all(isinstance(p, list) for p in pages):
+        return False
+    blocks = [b for page in pages for b in page]
+    if not all(isinstance(b, dict) and isinstance(b.get("id"), str) for b in blocks):
+        return False
+    text_ok = lambda t: isinstance(t, str) or (isinstance(t, list) and all(isinstance(c, str) for c in t))  # noqa: E731
+    return all(text_ok(b.get("text")) for b in blocks) and len({b["id"] for b in blocks}) == len(blocks)
 
 
 def _visible_doc(user: dict, doc_id: str) -> dict:

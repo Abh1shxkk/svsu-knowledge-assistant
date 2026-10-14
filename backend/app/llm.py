@@ -36,10 +36,11 @@ def check_key(key: str) -> str | None:
         return "OpenAI rejected this key." if status == 401 else f"Couldn't check the key with OpenAI ({type(e).__name__})."
 
 
-def chat(system: str, user: str, as_json: bool = False, model: str | None = None):
-    """One system+user turn. Returns text, or a parsed dict when as_json=True."""
+def chat(system: str, user: str, as_json: bool = False, model: str | None = None, temperature: float = 0.2):
+    """One system+user turn. Returns text, or a parsed dict when as_json=True. A low temperature keeps
+    answers to the same question consistent."""
     reply = client().chat.completions.create(
-        model=model or settings.chat_model,
+        model=model or settings.chat_model, temperature=temperature,
         messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         response_format={"type": "json_object"} if as_json else None,
     )
