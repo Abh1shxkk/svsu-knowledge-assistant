@@ -145,8 +145,11 @@ textarea.inp{resize:vertical}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:transparent;padding:6px 11px;font-size:12.5px;display:flex;gap:6px;align-items:center;color:var(--fg-2)}
 .seg button.on{background:var(--brand-soft);color:var(--brand);font-weight:500}
-.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin}
-.tabs button{border:0;background:transparent;padding:10px 12px;font-size:13px;color:var(--fg-2);border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px}
+/* The line is an inset shadow, so the active tab's underline sits on it without overflowing (no scrollbar);
+   the strip still swipes sideways on narrow screens. */
+.tabs{display:flex;gap:2px;box-shadow:inset 0 -1px var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:transparent;padding:10px 12px;font-size:13px;color:var(--fg-2);border-bottom:2px solid transparent;white-space:nowrap}
 .tabs button.on{color:var(--brand);border-color:var(--brand);font-weight:500}
 .tabs button .c{font-size:11px;color:var(--fg-3);margin-left:4px}
 .table-wrap{overflow-x:auto}
