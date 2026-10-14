@@ -43,6 +43,7 @@ test("administrators see the answer-quality card", async ({ page }) => {
   await page.locator("#u").fill(process.env.E2E_ADMIN_ID ?? "");
   await page.locator("#p").fill(process.env.E2E_ADMIN_PASS ?? "");
   await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page.locator(".side")).toBeVisible();  // signed in before moving on
   await page.goto("/reports");
   await expect(page.getByRole("heading", { name: "Answer quality" })).toBeVisible();
 });
