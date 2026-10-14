@@ -34,6 +34,8 @@ test.afterAll(async ({ request }) => {
 });
 
 test("ask only the documents of one department, listed beside the chat", async ({ page }) => {
+  const errors: string[] = [];  // browser errors fail the test, with where they happened
+  page.on("pageerror", (e) => { errors.push(e.message); console.log("PAGE ERROR:", e.message, (e.stack ?? "").split("\n").slice(0, 6).join(" <- ")); });
   await page.goto("/login");
   await page.locator("#u").fill(process.env.E2E_ADMIN_ID ?? "");
   await page.locator("#p").fill(process.env.E2E_ADMIN_PASS ?? "");
@@ -58,4 +60,5 @@ test("ask only the documents of one department, listed beside the chat", async (
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.locator(".srcs")).toContainText(`E2E invigilation ${stamp}`, { timeout: 90_000 });
   await expect(list.filter({ hasText: `E2E invigilation ${stamp}` })).toHaveClass(/cited/);
+  expect(errors).toEqual([]);
 });

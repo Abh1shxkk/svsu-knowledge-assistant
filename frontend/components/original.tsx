@@ -6,6 +6,8 @@ import type { Doc } from "@/lib/types";
 import { Icon } from "./icon";
 
 const isPdf = (d: Doc) => d.file?.mime === "application/pdf";
+/** PDFs and photos can be shown as they are; for text, Word and Excel the text view is the document. */
+export const previewable = (d: Doc) => isPdf(d) || !!d.file?.mime.startsWith("image/");
 /** Pages in the original file (PDFs), or the pages of text read from it. */
 export const originalPages = (d: Doc) => (isPdf(d) ? d.file?.pages ?? 1 : 1);
 

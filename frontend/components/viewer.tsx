@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getDoc, useFullDoc, useStore } from "@/lib/store";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "./icon";
-import { DownloadOriginal, OriginalFile, originalPages } from "./original";
+import { DownloadOriginal, OriginalFile, originalPages, previewable } from "./original";
 import { Pages } from "./paper";
 import { Pill } from "./ui";
 
@@ -16,7 +16,7 @@ export function Viewer() {
   const { closeViewer, openViewer, save, toast } = useStore.getState();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<"original" | "text">("original");  // the real file, or the text read from it
-  const showOriginal = view === "original" && !!doc?.file;
+  const showOriginal = view === "original" && !!doc && previewable(doc);
 
   useEffect(() => {
     const mk = bodyRef.current?.querySelector("mark.hl, tr.hlb");
@@ -76,7 +76,7 @@ export function Viewer() {
           </div>
         )}
         <div className="vtools">
-          {doc.file && (
+          {previewable(doc) && (
             <div className="seg" role="tablist" aria-label="View">
               <button role="tab" aria-selected={showOriginal} className={showOriginal ? "on" : ""} onClick={() => setView("original")} type="button">Original</button>
               <button role="tab" aria-selected={!showOriginal} className={!showOriginal ? "on" : ""} onClick={() => setView("text")} type="button">Text</button>
@@ -89,7 +89,7 @@ export function Viewer() {
           <span className="pg">{Math.round(v.zoom * 100)}%</span>
           <button className="btn sm" aria-label="Zoom in" onClick={() => zoom(0.1)} type="button"><Icon n="zin" s /></button>
           <span style={{ flex: 1 }} />
-          {showOriginal && <DownloadOriginal doc={doc} small />}
+          <DownloadOriginal doc={doc} small />
           {hl && <button className="btn sm" onClick={bookmark} type="button"><Icon n="bm" s /> Bookmark passage</button>}
           <Link className="btn sm" href={`/library/${doc.id}`} onClick={closeViewer}><Icon n="open" s /> Details</Link>
         </div>

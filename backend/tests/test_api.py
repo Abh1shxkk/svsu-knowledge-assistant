@@ -291,3 +291,18 @@ def test_pdf_pages_are_served_as_pictures_to_permitted_people(client, people):
     assert r.status_code == 200 and r.content[:2] == bytes([0xFF, 0xD8])  # a JPEG
     assert client.get("/documents/PG1/file/page/3", headers=up).status_code == 404
     assert client.get("/documents/PG1/file/page/1", headers=v).status_code == 404   # not published
+
+
+def test_answer_text_is_always_plain_strings(monkeypatch):
+    """The model sometimes returns objects where text belongs; that used to crash the Ask page."""
+    from app import rag
+    hits = [{"doc_id": "D1", "page": 1, "block": "b1", "text": "Exams start on 12 October."}]
+    docs = {"D1": {"title": "T", "ref": "R", "status": "Active", "effective": "", "expiry": ""}}
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: {
+        "label": "One source", "banner": {"kind": "revised", "text": {"text": "Changed."}},
+        "body": ["Plain {1}", {"ul": [{"item": "First"}, "Second"]}, {"table": {"head": ["A", 1], "rows": [[{"v": "x"}, 2]]}}],
+        "cites": [{"excerpt": 1}], "follow": [{"question": "When do exams end?"}, None, "Where?"]})
+    res = rag._generate("q", hits, docs, "en")
+    assert res["follow"] == ["When do exams end?", "Where?"]
+    assert res["body"] == [{"p": "Plain {1}"}, {"ul": ["First", "Second"]}, {"table": {"head": ["A", "1"], "rows": [["x", "2"]]}}]
+    assert res["banner"] == {"kind": "revised", "text": "Changed."}

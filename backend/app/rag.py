@@ -174,6 +174,40 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     return result
 
 
+def _text(x) -> str:
+    """The model sometimes wraps a string in an object ({"question": "..."}); the screens need plain text."""
+    if isinstance(x, str):
+        return x
+    if isinstance(x, dict):
+        return next((str(v) for v in x.values() if isinstance(v, (str, int, float))), "")
+    return "" if x is None else str(x)
+
+
+def _clean_body(body) -> list[dict]:
+    """Keep only the block shapes the screens draw, with every piece of text a string."""
+    out: list[dict] = []
+    for part in body if isinstance(body, list) else []:
+        if isinstance(part, str):
+            part = {"p": part}
+        if not isinstance(part, dict):
+            continue
+        for key in ("p", "sub"):
+            if key in part:
+                out.append({key: _text(part[key])})
+        for key in ("ul", "opts"):
+            if isinstance(part.get(key), list):
+                out.append({key: [t for t in map(_text, part[key]) if t]})
+        if isinstance(part.get("table"), dict):
+            t = part["table"]
+            out.append({"table": {"head": [_text(h) for h in t.get("head") or []],
+                                  "rows": [[_text(c) for c in r] for r in t.get("rows") or [] if isinstance(r, list)]}})
+    return out
+
+
+def _clean_banner(b) -> dict | None:
+    return {"kind": _text(b.get("kind")), "text": _text(b.get("text"))} if isinstance(b, dict) and b.get("text") else None
+
+
 def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True) -> dict:
     def excerpt(n, p):
         d = docs[p["doc_id"]]
@@ -187,7 +221,7 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
     # The model's own list of the excerpts it used (numbers may arrive as text).
     listed = {int(c["excerpt"]): c.get("quote") for c in res.get("cites") or []
               if isinstance(c, dict) and str(c.get("excerpt", "")).strip().isdigit() and 1 <= int(c["excerpt"]) <= len(hits)}
-    body = res.get("body") or []
+    body = _clean_body(res.get("body"))
     if listed and not re.search(r"\{\d+\}", json.dumps(body)):
         # It listed sources but left out the {n} markers: cite them at the end of the answer, never drop them.
         marks = " " + "".join(f"{{{n}}}" for n in listed)
@@ -208,8 +242,8 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
         cites.append({"doc": p["doc_id"], "page": p["page"], "block": p["block"],
                       "quote": quote if quote and quote in p["text"] else p["text"][:160]})
     return {"source": "documents", "label": res.get("label") if res.get("label") in LABELS else "One source",
-            "banner": res.get("banner"), "body": json.loads(text), "cites": cites,
-            "follow": (res.get("follow") or [])[:3]}
+            "banner": _clean_banner(res.get("banner")), "body": json.loads(text), "cites": cites,
+            "follow": [t for t in map(_text, res.get("follow") or []) if t][:3]}
 
 
 _INSUFFICIENT = {

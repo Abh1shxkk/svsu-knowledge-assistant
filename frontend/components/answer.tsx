@@ -13,9 +13,13 @@ export const KIND_INFO: Record<string, string> = {
 };
 const BANNER_ICON: Record<string, string> = { conflict: "alert", revised: "rev", insuff: "search", scope: "clock", historical: "clock" };
 
+/** Answers saved before the server cleaned them may hold objects where text belongs; show their text. */
+const txt = (x: unknown): string =>
+  typeof x === "string" ? x : x && typeof x === "object" ? String(Object.values(x)[0] ?? "") : x == null ? "" : String(x);
+
 /** Render **bold** and {n} citation markers as clickable chips. */
-function inline(text: string, msgId: string, onCite: (i: number) => void): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|\{\d+\})/g).filter(Boolean).map((part, i) => {
+function inline(text: unknown, msgId: string, onCite: (i: number) => void): ReactNode[] {
+  return txt(text).split(/(\*\*[^*]+\*\*|\{\d+\})/g).filter(Boolean).map((part, i) => {
     const bold = part.match(/^\*\*([^*]+)\*\*$/);
     if (bold) return <strong key={i}>{bold[1]}</strong>;
     const cite = part.match(/^\{(\d+)\}$/);
@@ -37,12 +41,12 @@ function Part({ part, msgId, lang, onCite, onAsk }: {
   if (part.sub !== undefined) return <p className="sub">{inline(part.sub, msgId, onCite)}</p>;
   if (part.ul) return <ul>{part.ul.map((x, i) => <li key={i} lang={lang}>{inline(x, msgId, onCite)}</li>)}</ul>;
   if (part.opts) return (
-    <div className="chips">{part.opts.map((q, i) => (
+    <div className="chips">{part.opts.map(txt).map((q, i) => (
       <button key={i} className="fchip" onClick={() => onAsk(q)} type="button">{q}</button>))}</div>
   );
   if (part.table) return (
     <div className="table-wrap"><table>
-      <thead><tr>{part.table.head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+      <thead><tr>{part.table.head.map((h, i) => <th key={i}>{txt(h)}</th>)}</tr></thead>
       <tbody>{part.table.rows.map((r, i) => (
         <tr key={i}>{r.map((x, j) => <td key={j}>{inline(x, msgId, onCite)}</td>)}</tr>))}</tbody>
     </table></div>
@@ -60,7 +64,7 @@ export function AnswerView({ answer, msgId, lang, onCite, onAsk }: {
       <div className="mb">
         {answer.banner && (
           <div className={`banner ${answer.banner.kind === "historical" ? "historical" : answer.banner.kind}`}>
-            <Icon n={BANNER_ICON[answer.banner.kind] ?? "alert"} s /><span>{answer.banner.text}</span>
+            <Icon n={BANNER_ICON[answer.banner.kind] ?? "alert"} s /><span>{txt(answer.banner.text)}</span>
           </div>
         )}
         {answer.body.map((part, i) => (
@@ -84,7 +88,7 @@ export function AnswerView({ answer, msgId, lang, onCite, onAsk }: {
       )}
       {answer.follow.length > 0 && (
         <div className="follow" style={{ paddingTop: 12 }}>
-          {answer.follow.map((q, i) => (
+          {answer.follow.map(txt).filter(Boolean).map((q, i) => (
             <button key={i} className="fchip" lang={/[ऀ-ॿ]/.test(q) ? "hi" : "en"}
               onClick={() => onAsk(q)} type="button">{q}</button>
           ))}
@@ -100,11 +104,11 @@ export function answerText(a: Answer): string {
   const lines: string[] = [];
   if (a.banner) lines.push("Note: " + a.banner.text);
   for (const p of a.body) {
-    if (p.p) lines.push(clean(p.p));
-    if (p.sub) lines.push(clean(p.sub));
-    if (p.ul) p.ul.forEach((x) => lines.push("• " + clean(x)));
-    if (p.opts) p.opts.forEach((x) => lines.push("• " + x));
-    if (p.table) { lines.push(p.table.head.join(" | ")); p.table.rows.forEach((r) => lines.push(r.map(clean).join(" | "))); }
+    if (p.p) lines.push(clean(txt(p.p)));
+    if (p.sub) lines.push(clean(txt(p.sub)));
+    if (p.ul) p.ul.forEach((x) => lines.push("• " + clean(txt(x))));
+    if (p.opts) p.opts.forEach((x) => lines.push("• " + txt(x)));
+    if (p.table) { lines.push(p.table.head.map(txt).join(" | ")); p.table.rows.forEach((r) => lines.push(r.map((c) => clean(txt(c))).join(" | "))); }
   }
   return lines.join("\n");
 }
