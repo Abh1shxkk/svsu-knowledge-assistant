@@ -19,7 +19,7 @@ export default function DocDetail() {
   const d = getDoc(s, id);
   const full = useFullDoc(id);
   const [tab, setTab] = useState("overview");
-  const { openViewer, openModal, save, toast, set } = useStore.getState();
+  const { openViewer, openModal, save, toast } = useStore.getState();
 
   if (!d) return <div className="wrap"><div className="empty">Document not found.</div></div>;
   const approver = canApprove(s);
@@ -32,7 +32,7 @@ export default function DocDetail() {
     ["access", "Access"], ["deadlines", "Actions & deadlines", dls.length], ["bookmarks", "Bookmarks", bms.length],
   ];
 
-  const askAbout = () => { set({ scope: { mode: "files", files: [d.id], coll: null }, activeChat: null }); toast("Scope set to this document"); router.push("/ask"); };
+  const askAbout = () => router.push(`/ask?group=doc:${encodeURIComponent(d.id)}`);
   const restore = async () => { if (await save("documents", { ...d, status: "Active" })) toast("Document restored to Active"); };
   const resubmit = async () => {
     const step = { step: d.status === "Draft" ? "Submitted for approval" : "Resubmitted for approval", by: me(s).name, date: todayIso(), kind: "" as const };

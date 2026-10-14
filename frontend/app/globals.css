@@ -735,3 +735,18 @@ h1,h2,h3,h4{letter-spacing:-.02em}
   .login-art-mid,.login-art-foot{display:none}
   .login-side{padding:28px 16px 40px;place-items:start center}
 }
+
+/* ---------- Ask AI: documents being searched ---------- */
+.hist .htabs{margin:12px 14px 0;display:flex}
+.hist .htabs button{flex:1;justify-content:center;display:inline-flex;gap:6px;align-items:center}
+.dpick{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border-radius:8px}
+.dpick:hover{background:var(--surface-2)}
+.dpick.cited{background:var(--accent-soft)}
+.dpick.off .t{opacity:.45}
+.dpick input{margin-top:3px;flex:none}
+.dpick .t{border:0;background:none;text-align:left;padding:0;min-width:0;flex:1;color:inherit;cursor:pointer;font:inherit}
+.dpick .t b{display:block;font-weight:500;font-size:13px;line-height:1.35}
+.dpick .t span{font-size:11.5px;color:var(--fg-3)}
+.dpick .cited-mark{color:var(--accent);flex:none;margin-top:2px}
+.csec{display:flex;flex-direction:column;gap:12px}
+.coll.auto .ask{color:var(--accent);display:inline-flex;gap:4px;align-items:center;font-weight:500}

@@ -3,12 +3,12 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { aiSettings, chatGroup, clearScope, filterCount, scopeDocs, scopeLabel, useStore } from "@/lib/store";
+import { aiSettings, chatGroup, clearScope, groupLabel, scopeDocs, setScope, useStore } from "@/lib/store";
 import type { Answer, Chat, Msg } from "@/lib/types";
 import { isHindi, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { AnswerView, KIND_INFO, answerText } from "@/components/answer";
-import { ScopeModal, FiltersModal } from "./modals";
+import { DocsPanel } from "./docs-panel";
 import { CompareModal, ExportModal, FeedbackModal, RequestDocModal, rate, reportConflict, type ExportItem } from "@/components/modals";
 
 const SUGGESTIONS: [string, string][] = [
@@ -34,11 +34,14 @@ function Ask() {
   const [histOpen, setHistOpen] = useState(false);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"docs" | "chats">("docs");
 
-  // Open a chat (?c=) or ask a question (?q=) from a link.
+  // Links: open a chat (?c=), ask a question (?q=), or search a group of documents (?group=dept:Examination).
   useEffect(() => {
     const c = params.get("c");
     const q = params.get("q");
+    const g = params.get("group");
+    if (g) { setScope(g); set({ activeChat: null }); }
     if (c && s.chats.some((x) => x.id === c)) set({ activeChat: c });
     else if (q) { set({ activeChat: null }); void ask(q); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,10 +92,18 @@ function Ask() {
 
   const groups: Record<string, Chat[]> = {};
   s.chats.forEach((c) => { (groups[chatGroup(c)] ??= []).push(c); });
+  const cited = new Set(active?.msgs.flatMap((m) => (m.role === "ai" ? m.answer?.cites.map((c) => c.doc) ?? [] : [])));
+  const inScope = scopeDocs(s).length;
+  const showDocs = () => { setTab("docs"); setHistOpen(true); };
 
   return (
     <div className={`chat ${histOpen ? "histopen" : ""}`}>
-      <aside className="hist" aria-label="Conversation history">
+      <aside className="hist" aria-label="Documents and conversations">
+        <div className="htabs seg" role="tablist">
+          <button role="tab" aria-selected={tab === "docs"} className={tab === "docs" ? "on" : ""} onClick={() => setTab("docs")} type="button"><Icon n="file" s /> Documents</button>
+          <button role="tab" aria-selected={tab === "chats"} className={tab === "chats" ? "on" : ""} onClick={() => setTab("chats")} type="button"><Icon n="chat" s /> Chats</button>
+        </div>
+        {tab === "docs" ? <DocsPanel cited={cited} /> : <>
         <div className="hh">
           <button className="btn pri" style={{ justifyContent: "center" }} onClick={() => { set({ activeChat: null }); setHistOpen(false); }} type="button"><Icon n="plus" s /> New conversation</button>
           <input className="inp" placeholder="Search conversations" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search conversations" />
@@ -112,16 +123,15 @@ function Ask() {
           })}
           {!s.chats.length && <div className="empty sm">No conversations yet.</div>}
         </div>
+        </>}
       </aside>
 
       <section className="conv">
         <div className="convh">
-          <button className="iconbtn menu-btn" aria-label="Show history" onClick={() => setHistOpen((o) => !o)} type="button"><Icon n="hist" /></button>
+          <button className="iconbtn menu-btn" aria-label="Show documents and conversations" onClick={() => setHistOpen((o) => !o)} type="button"><Icon n="hist" /></button>
           <span className="ttl">{active?.title ?? "New conversation"}</span>
-          <button className="scopebtn" onClick={() => openModal({ title: "What should the assistant search?", body: <ScopeModal /> })} type="button">
-            <Icon n="layers" s /><span>Scope:</span><b>{scopeLabel(s)}</b><Icon n="cd" s /></button>
-          <button className="scopebtn" onClick={() => openModal({ title: "Filter the documents searched", body: <FiltersModal /> })} type="button">
-            <Icon n="filter" s />Filters{filterCount(s) > 0 && <span className="fcount">{filterCount(s)}</span>}</button>
+          <button className="scopebtn" onClick={showDocs} type="button" title="Choose which documents to search">
+            <Icon n="layers" s /><b>{groupLabel(s, s.scope.group)}</b><span>· {inScope} document{inScope === 1 ? "" : "s"}</span></button>
           {active && active.msgs.length > 0 && <>
             <button className="btn ghost sm" type="button" onClick={() => openModal({ title: "Export cited summary", wide: true, body: <ExportModal title={active.title} items={exportItems(active)} /> })}><Icon n="export" s /> Export</button>
             <button className="btn ghost sm" onClick={() => saveChat(active)} type="button"><Icon n="save" s /> {active.saved ? "Saved" : "Save"}</button>
@@ -147,7 +157,7 @@ function Ask() {
             <div className="cmeta">
               <span><Icon n="globe" s /> Answer in <select value={s.ansLang} onChange={(e) => set({ ansLang: e.target.value })} aria-label="Answer language">
                 <option value="auto">Same as question</option><option value="en">English</option><option value="hi">हिन्दी</option></select></span>
-              <span>Searching {scopeDocs(s).length} documents</span>
+              <span>Searching {inScope} document{inScope === 1 ? "" : "s"}</span>
               <span>Answers come only from the records and always cite their sources.</span>
             </div>
           </form>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { permitted, useStore } from "@/lib/store";
+import { permitted, scopeGroups, useStore } from "@/lib/store";
 import { fmtD, nid, plural, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Field } from "@/components/ui";
@@ -14,9 +14,29 @@ export default function CollectionsPage() {
   return (
     <div className="wrap">
       <div className="pagehead">
-        <div><h2>Collections</h2><p>Group documents for a team or task, then ask questions limited to that group.</p></div>
+        <div><h2>Collections</h2><p>Documents grouped by department and subject automatically, plus groups you make. Open one to ask questions limited to it.</p></div>
         <button className="btn pri" onClick={() => openModal({ title: "New collection", body: <NewCollection /> })} type="button"><Icon n="plus" s /> New collection</button>
       </div>
+      {scopeGroups(s).filter((g) => g.kind !== "coll").map((g) => (
+        <section key={g.kind} className="csec">
+          <div className="sechead"><h3>By {g.label === "Departments" ? "department" : "subject"}</h3><span className="xs muted">Updated automatically as documents are published</span></div>
+          {g.items.length ? (
+            <div className="cgrid">
+              {g.items.map((i) => (
+                <Link key={i.value} className="coll auto" href={`/ask?group=${encodeURIComponent(i.value)}`}>
+                  <div className="stack">{Array.from({ length: Math.min(i.count, 4) }, (_, n) => <i key={n} />)}</div>
+                  <b>{i.label}</b>
+                  <div className="row between xs muted" style={{ marginTop: "auto" }}>
+                    <span>{plural(i.count, "document")}</span><span className="ask"><Icon n="spark" s /> Ask</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : <div className="card empty">Published documents will be grouped here.</div>}
+        </section>
+      ))}
+
+      <div className="sechead"><h3>Made by people</h3></div>
       <div className="cgrid">
         {s.collections.map((co) => (
           <Link key={co.id} className="coll" href={`/collections/${co.id}`}>
@@ -27,7 +47,7 @@ export default function CollectionsPage() {
             </div>
           </Link>
         ))}
-        {!s.collections.length && <div className="card empty">No collections yet.</div>}
+        {!s.collections.length && <div className="card empty">No collections yet. Use “New collection” to group documents for a team or task.</div>}
       </div>
     </div>
   );

@@ -10,11 +10,11 @@ export type Viewer = {
   doc: string; page?: number; block?: string; quote?: string; zoom: number;
   cites?: Cite[]; idx?: number; msg?: string;
 };
-export type Scope = { mode: "all" | "files" | "collection"; files: string[]; coll: string | null };
-export type Filters = { dept: string; subject: string; type: string; from: string; to: string };
+/** What the assistant searches: a group of documents, minus any the person unticked.
+ *  group is "all", "dept:<name>", "tag:<subject>", "coll:<collection id>" or "doc:<document id>". */
+export type Scope = { group: string; off: string[] };
 export type Modal = { title: string; body: ReactNode; foot?: ReactNode; wide?: boolean; drawer?: boolean } | null;
 
-const NO_FILTERS: Filters = { dept: "", subject: "", type: "", from: "", to: "" };
 const EMPTY: Records = {
   documents: [], collections: [], deadlines: [], chats: [], bm_answers: [], bm_passages: [], feedback: [],
   unanswered: [], conflicts: [], users: [], audit: [], settings: [], reminders: [], prefs: [],
@@ -22,7 +22,7 @@ const EMPTY: Records = {
 
 type State = Records & {
   loaded: boolean; error: string; session: SessionUser | null;
-  scope: Scope; filters: Filters; ansLang: string; activeChat: string | null;
+  scope: Scope; ansLang: string; activeChat: string | null;
   viewer: Viewer | null; modal: Modal; toasts: { id: string; msg: string }[];
   /** Documents opened in full (with their text), by id. */
   full: Record<string, Doc>;
@@ -43,7 +43,7 @@ type State = Records & {
 export const useStore = create<State>((set, get) => ({
   ...EMPTY,
   loaded: false, error: "", session: null,
-  scope: { mode: "all", files: [], coll: null }, filters: NO_FILTERS, ansLang: "auto", activeChat: null,
+  scope: { group: "all", off: [] }, ansLang: "auto", activeChat: null,
   viewer: null, modal: null, toasts: [], full: {},
 
   load: async () => {
@@ -142,23 +142,40 @@ export const permitted = (s: S): Doc[] => s.documents;
 export const ANSWERABLE_ST = ["Active", "Superseded", "Expired"];
 export const answerable = (s: S) => s.documents.filter((d) => ANSWERABLE_ST.includes(d.status));
 
-export const scopeDocs = (s: S) => {
-  let ds = answerable(s);
-  if (s.scope.mode === "files") ds = ds.filter((d) => s.scope.files.includes(d.id));
-  if (s.scope.mode === "collection") {
-    const co = s.collections.find((c) => c.id === s.scope.coll);
-    ds = ds.filter((d) => co?.docs.includes(d.id));
-  }
-  const f = s.filters;
-  return ds.filter((d) => (!f.dept || d.dept === f.dept) && (!f.subject || d.tags.includes(f.subject))
-    && (!f.type || d.type === f.type) && (!f.from || d.date >= f.from) && (!f.to || d.date <= f.to));
+const split = (group: string) => { const i = group.indexOf(":"); return i < 0 ? [group, ""] : [group.slice(0, i), group.slice(i + 1)]; };
+
+/** The answerable documents in a group (before any are unticked). */
+export const groupDocs = (s: S, group: string): Doc[] => {
+  const [kind, v] = split(group);
+  const co = kind === "coll" ? s.collections.find((c) => c.id === v) : undefined;
+  return answerable(s).filter((d) => kind === "dept" ? d.dept === v : kind === "tag" ? d.tags.includes(v)
+    : kind === "coll" ? !!co?.docs.includes(d.id) : kind === "doc" ? d.id === v : true);
 };
-export const filterCount = (s: S) => Object.values(s.filters).filter(Boolean).length;
-export const scopeLabel = (s: S) =>
-  s.scope.mode === "files" ? `${s.scope.files.length} selected file${s.scope.files.length === 1 ? "" : "s"}`
-    : s.scope.mode === "collection" ? s.collections.find((c) => c.id === s.scope.coll)?.name ?? "Collection"
-      : "All permitted documents";
-export const clearScope = () => useStore.setState({ scope: { mode: "all", files: [], coll: null }, filters: NO_FILTERS });
+export const scopeDocs = (s: S) => groupDocs(s, s.scope.group).filter((d) => !s.scope.off.includes(d.id));
+
+export const groupLabel = (s: S, group: string) => {
+  const [kind, v] = split(group);
+  return kind === "coll" ? s.collections.find((c) => c.id === v)?.name ?? "Collection"
+    : kind === "doc" ? getDoc(s, v)?.title ?? "One document" : kind === "all" ? "All documents" : v;
+};
+
+/** Ready-made groups: every department and subject that has documents, plus the collections. */
+export const scopeGroups = (s: S) => {
+  const docs = answerable(s);
+  const count = (values: string[]) => {
+    const n: Record<string, number> = {};
+    values.forEach((v) => { if (v) n[v] = (n[v] ?? 0) + 1; });
+    return Object.entries(n).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  };
+  return [
+    { label: "Departments", kind: "dept", items: count(docs.map((d) => d.dept)) },
+    { label: "Subjects", kind: "tag", items: count(docs.flatMap((d) => d.tags)) },
+    { label: "Collections", kind: "coll", items: s.collections.map((c) => [c.id, groupDocs(s, "coll:" + c.id).length] as [string, number]) },
+  ].map((g) => ({ ...g, items: g.items.map(([v, n]) => ({ value: `${g.kind}:${v}`, label: g.kind === "coll" ? groupLabel(s, "coll:" + v) : v, count: n })) }));
+};
+
+export const setScope = (group: string, off: string[] = []) => useStore.setState({ scope: { group, off } });
+export const clearScope = () => setScope("all");
 
 const EMPTY_LISTS: Lists = { TAGS: [], AUDS: [], DEPTS: [], TYPES: [], AUTHS: [], INSTS: [], VIS: [], VIS_DESC: {} };
 /** "Today", "Yesterday", "Previous 7 days" or the month, from a chat's start time. */

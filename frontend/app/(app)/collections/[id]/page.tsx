@@ -14,12 +14,12 @@ export default function CollectionDetail() {
   const router = useRouter();
   const s = useStore();
   const co = s.collections.find((c) => c.id === id);
-  const { save, remove, set, toast, openModal, closeModal } = useStore.getState();
+  const { save, remove, toast, openModal, closeModal } = useStore.getState();
   if (!co) return <div className="wrap"><div className="empty">Collection not found.</div></div>;
   const ds = co.docs.map((d) => getDoc(s, d)).filter(Boolean);
   const mine = ownsItem(s, co);
 
-  const askColl = () => { set({ scope: { mode: "collection", files: [], coll: co.id }, activeChat: null }); toast("Scope set to this collection"); router.push("/ask"); };
+  const askColl = () => router.push(`/ask?group=coll:${encodeURIComponent(co.id)}`);
   const removeDoc = async (docId: string) => { if (await save("collections", { ...co, docs: co.docs.filter((x) => x !== docId), updated: todayIso() })) toast("Removed from collection"); };
   const del = () => openModal({
     title: "Delete collection?",
