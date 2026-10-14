@@ -24,7 +24,7 @@ export default function ReviewPage() {
   const setComment = (c: string) => setForm({ id: d!.id, comment: c, ticked });
   const setTicked = (t: number[]) => setForm({ id: d!.id, comment, ticked: t });
   const [loaded, setLoaded] = useState<{ id: string; list: [string, string][] } | null>(null);
-  const checks = loaded?.id === d?.id ? loaded!.list : null;
+  const checks = d && loaded?.id === d.id ? loaded.list : null;  // an empty queue has no document
   useEffect(() => {
     const id = d?.id;
     if (id) api.checks(id).then((list) => setLoaded({ id, list })).catch(() => setLoaded({ id, list: [["warn", "Automatic checks could not run"]] }));
