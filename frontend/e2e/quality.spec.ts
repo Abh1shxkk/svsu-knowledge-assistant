@@ -79,8 +79,8 @@ test("two-step verification: set up, sign in with a code and a recovery code, lo
   const secret = (await page.locator(".mfa-key").textContent())!;
   await page.locator("#mfa-first").fill(totp(secret));
   await page.getByRole("button", { name: "Turn on" }).click();
+  await expect(page.locator(".mfa-codes span")).toHaveCount(8);
   const codes = await page.locator(".mfa-codes span").allTextContents();
-  expect(codes).toHaveLength(8);
   await page.getByRole("button", { name: "I've saved them" }).click();
   await expect(page.locator(".pill.ok", { hasText: "On" })).toBeVisible();
 

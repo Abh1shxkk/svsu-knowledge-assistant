@@ -22,5 +22,21 @@ month") answered from document details; staff 👎 answers fed into the quality 
   sign-in (set-up, sign-in with a code, a recovery code, lock-out) and the check list.
 - The 14 real questions score at least as well as before; the quality-test report is attached below.
 
-## Results
-(filled in after the round)
+## Results (14 October 2026, test server)
+All six steps are built and deployed. 65 API tests and 12 browser tests pass against the live site
+(new: streaming, fact-check warning, two-step set-up / code / recovery code / lock-out, text-check list).
+
+**14 real questions:** 14 of 14 answered with the right facts, against 13 before. The Yuva Samvad total
+(2868), missed before, is now found: re-ranking brings the table's Total row in. One answer left out a
+detail (Foundation Day: date and venue right, 10:45 AM time missing).
+
+**Speed (one live question):** progress shows at once; first words at about 6 s; finished, with the
+fact check, at about 8 s. Before, nothing showed for 5–8 s.
+
+**Fact check:** the first version flagged a correct answer because another circular named a different
+person for the same job ("IT Assistance"). It now reads only the records the answer cites and is told that
+records may be about different events.
+
+**Automatic quality test:** the saved set has only 5 questions, too few to compare runs (80% correct
+before and after; the one miss is a test question written from garbled OCR of a website address). A new set
+of 50 questions (about ₹30–50) gives a figure worth comparing.
