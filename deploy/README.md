@@ -21,3 +21,10 @@ Roll back the website: on the server, `cd ~/svsu/deploy && rm -rf web && mv web.
 - Back up: `sudo docker compose exec db pg_dump -U svsu -Fc svsu_assistant > svsu-$(date +%F).dump`.
 - Logs: `sudo docker compose logs -f api`.
 - The Caddy block lives in `/home/ubuntu/caddy/Caddyfile` (reload: `sudo docker exec caddy caddy reload --config /etc/caddy/Caddyfile`).
+
+## Look at the database (DBeaver, pgAdmin, TablePlus)
+The database listens only on the server itself (`127.0.0.1:5440`), never on the internet.
+1. Open a tunnel and leave it running: `ssh -i <key> -N -L 5440:127.0.0.1:5440 ubuntu@54.173.64.109`
+2. Connect to host `localhost`, port `5440`, database `svsu_assistant`, user `svsu`.
+   The password is `DB_PASSWORD` in `~/svsu/deploy/.env` on the server.
+It is the live data: take a backup before changing anything.

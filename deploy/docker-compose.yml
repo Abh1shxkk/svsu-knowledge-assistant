@@ -11,6 +11,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: svsu_assistant
     volumes: [db:/var/lib/postgresql/data]
+    ports: ["127.0.0.1:5440:5432"]   # server-only; reach it from a PC through an SSH tunnel (deploy/README.md)
     mem_limit: 256m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U svsu -d svsu_assistant"]
