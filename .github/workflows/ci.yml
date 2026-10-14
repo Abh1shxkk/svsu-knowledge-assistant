@@ -28,3 +28,56 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx eslint app components lib
       - run: npx next build
+
+  # Every push to main that passes the checks above goes to the test server (deploy/README.md).
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: { group: deploy-test-server, cancel-in-progress: false }   # one deploy at a time
+    environment: { name: test-server, url: "https://svsu.54-173-64-109.sslip.io" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+
+      - name: Build the website (here, not on the small server)
+        working-directory: frontend
+        env: { NEXT_DIST_DIR: .next-prod, NEXT_PUBLIC_API_URL: /api, NEXT_TELEMETRY_DISABLED: "1" }
+        run: |
+          npm ci
+          npx next build
+          mkdir -p ../web && cp -r .next-prod/standalone/. ../web/
+          cp -r .next-prod/static ../web/.next-prod/static && cp -r public ../web/public
+          tar -czf ../web.tgz -C ../web .
+
+      - name: Connect to the server
+        env: { KEY: "${{ secrets.DEPLOY_SSH_KEY }}", HOSTS: "${{ secrets.DEPLOY_KNOWN_HOSTS }}" }
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$HOSTS" > ~/.ssh/known_hosts   # only the real server is trusted
+          echo "TARGET=${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: |
+          scp -i ~/.ssh/deploy web.tgz "$TARGET:svsu/deploy/web.tgz"
+          ssh -i ~/.ssh/deploy "$TARGET" "bash -s" -- "${{ github.sha }}" <<'EOF'
+          set -euo pipefail
+          cd ~/svsu
+          git fetch -q origin && git checkout -q --force "$1"       # exactly the commit that passed the checks
+          cd deploy
+          rm -rf web.new && mkdir web.new && tar -xzf web.tgz -C web.new && rm web.tgz
+          rm -rf web.old && { [ -d web ] && mv web web.old || true; } && mv web.new web   # web.old = rollback
+          sudo docker compose up -d --build --remove-orphans
+          sudo docker compose restart web
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8097/health >/dev/null && break; sleep 2; done
+          curl -sf http://127.0.0.1:8097/health && curl -sf -o /dev/null http://127.0.0.1:3097/login
+          sudo docker image prune -f --filter label=com.docker.compose.project=svsu >/dev/null   # only our old images
+          echo " deployed $1"
+          EOF
+
+      - name: Check the live site
+        run: |
+          curl -sf -o /dev/null https://svsu.54-173-64-109.sslip.io/login
+          curl -sf https://svsu.54-173-64-109.sslip.io/api/health
