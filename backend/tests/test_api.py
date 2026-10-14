@@ -288,6 +288,6 @@ def test_pdf_pages_are_served_as_pictures_to_permitted_people(client, people):
     assert ex["file"]["pages"] == 2
     assert put(client, up, "documents", doc("PG1", status="Pending", file=ex["file"])).status_code == 200
     r = client.get("/documents/PG1/file/page/2", headers=up)
-    assert r.status_code == 200 and r.content[1:4] == b"PNG"
+    assert r.status_code == 200 and r.content[:2] == bytes([0xFF, 0xD8])  # a JPEG
     assert client.get("/documents/PG1/file/page/3", headers=up).status_code == 404
     assert client.get("/documents/PG1/file/page/1", headers=v).status_code == 404   # not published

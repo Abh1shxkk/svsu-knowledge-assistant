@@ -309,8 +309,8 @@ def document_page_image(doc_id: str, n: int, user: dict = Depends(auth.current_u
     pdf = pymupdf.open(stream=stored[2], filetype="pdf")
     if not 1 <= n <= len(pdf):
         raise HTTPException(404, "No such page.")
-    png = pdf[n - 1].get_pixmap(dpi=144).tobytes("png")
-    return Response(png, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
+    jpg = pdf[n - 1].get_pixmap(dpi=130).tobytes("jpeg", jpg_quality=80)  # light enough for phones
+    return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.post("/documents/{doc_id}/deadlines")
