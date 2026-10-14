@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getDoc, useFullDoc, useStore } from "@/lib/store";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "./icon";
+import { DownloadOriginal, OriginalFile } from "./original";
 import { Pages } from "./paper";
 import { Pill } from "./ui";
 
@@ -14,6 +15,8 @@ export function Viewer() {
   const newer = useStore((s) => (doc?.supersededBy ? getDoc(s, doc.supersededBy) : undefined));
   const { closeViewer, openViewer, save, toast } = useStore.getState();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<"original" | "text">("original");  // the real file, or the text read from it
+  const showOriginal = view === "original" && !!doc?.file;
 
   useEffect(() => {
     const mk = bodyRef.current?.querySelector("mark.hl, tr.hlb");
@@ -23,7 +26,7 @@ export function Viewer() {
       bodyRef.current.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
       mk.classList.add("pulse");
     }
-  }, [v?.doc, v?.block, v?.idx, doc]);
+  }, [v?.doc, v?.block, v?.idx, doc, showOriginal]);
 
   if (!v || !doc) return null;
   const cites = v.cites ?? [];
@@ -67,26 +70,39 @@ export function Viewer() {
         {cur && (
           <div className="cstep">
             <button className="iconbtn" disabled={idx === 0} aria-label="Previous citation" onClick={() => step(-1)} type="button"><Icon n="cl" /></button>
-            <div className="q"><b>Citation {idx + 1} of {cites.length}</b> · page {cur.page}<em lang={doc.lang}>{cur.quote}</em></div>
+            <div className="q"><b>Citation {idx + 1} of {cites.length}</b> · page {cur.page}<em lang={doc.lang}>{cur.quote}</em>
+              {showOriginal && <button className="link xs" onClick={() => setView("text")} type="button">Show highlighted in text</button>}</div>
             <button className="iconbtn" disabled={idx === cites.length - 1} aria-label="Next citation" onClick={() => step(1)} type="button"><Icon n="cr" /></button>
           </div>
         )}
         <div className="vtools">
+          {doc.file && (
+            <div className="seg" role="tablist" aria-label="View">
+              <button role="tab" aria-selected={showOriginal} className={showOriginal ? "on" : ""} onClick={() => setView("original")} type="button">Original</button>
+              <button role="tab" aria-selected={!showOriginal} className={!showOriginal ? "on" : ""} onClick={() => setView("text")} type="button">Text</button>
+            </div>
+          )}
+          {!showOriginal && <>
           <button className="btn sm" aria-label="Previous page" disabled={(v.page ?? 1) <= 1} onClick={() => goPage(-1)} type="button"><Icon n="cl" s /></button>
           <span className="pg">Page {v.page ?? 1} / {pageCount}</span>
           <button className="btn sm" aria-label="Next page" disabled={(v.page ?? 1) >= pageCount} onClick={() => goPage(1)} type="button"><Icon n="cr" s /></button>
           <button className="btn sm" aria-label="Zoom out" onClick={() => zoom(-0.1)} type="button"><Icon n="zout" s /></button>
           <span className="pg">{Math.round(v.zoom * 100)}%</span>
           <button className="btn sm" aria-label="Zoom in" onClick={() => zoom(0.1)} type="button"><Icon n="zin" s /></button>
+          </>}
           <span style={{ flex: 1 }} />
+          {showOriginal && <DownloadOriginal doc={doc} small />}
           {hl && <button className="btn sm" onClick={bookmark} type="button"><Icon n="bm" s /> Bookmark passage</button>}
           <Link className="btn sm" href={`/library/${doc.id}`} onClick={closeViewer}><Icon n="open" s /> Details</Link>
         </div>
       </div>
-      <div className="vbody" ref={bodyRef}><Pages doc={doc} hl={hl} zoom={v.zoom} /></div>
+      <div className={`vbody ${showOriginal ? "orig-body" : ""}`} ref={bodyRef}>
+        {showOriginal ? <OriginalFile doc={doc} page={v.page ?? 1} /> : <Pages doc={doc} hl={hl} zoom={v.zoom} />}
+      </div>
       <div className="vfoot">
-        {hl ? <><i /><span>Highlighted text is the exact passage cited. Page {v.page}.</span></>
-          : <span>Viewing full document. Click a citation in an answer to jump to a passage.</span>}
+        {showOriginal ? <span>The original file as uploaded{hl ? `, at page ${v.page}. Use Text to see the cited passage highlighted.` : "."}</span>
+          : hl ? <><i /><span>Highlighted text is the exact passage cited. Page {v.page}.</span></>
+            : <span>The text read from the document{doc.fileType === "scan" ? " by OCR — check figures against the original" : ""}. Click a citation in an answer to jump to a passage.</span>}
       </div>
     </aside>
   );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isAdmin, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages, docText } from "@/components/paper";
+import { DownloadOriginal, OriginalFile } from "@/components/original";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Note, Pill, Tabs, DateBox, Due } from "@/components/ui";
@@ -66,6 +67,7 @@ export default function DocDetail() {
         <div className="row">
           {ANSWERABLE_ST.includes(d.status) && <button className="btn pri" onClick={askAbout} type="button"><Icon n="spark" s /> Ask about this</button>}
           <button className="btn" onClick={() => openViewer({ doc: d.id, page: 1 })} type="button"><Icon n="eye" s /> Open viewer</button>
+          <DownloadOriginal doc={d} />
           {!approver && isMine(s, d) && ["Draft", "Changes requested"].includes(d.status) && <button className="btn pri" onClick={resubmit} type="button">Submit for approval</button>}
           {editable && <button className="btn" onClick={() => openModal({ title: "Edit metadata", drawer: true, body: <EditMetaModal doc={d} /> })} type="button"><Icon n="edit" s /> Edit</button>}
           {approver && <button className="btn" onClick={link} type="button"><Icon n="link" s /> Link</button>}
@@ -80,7 +82,9 @@ export default function DocDetail() {
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === "overview" && <Overview d={d} full={full} approver={approver} />}
-      {tab === "preview" && <div className="pagesbox">{full ? <Pages doc={full} onBookmark={(page, block) => bookmarkPassage(full, page, block)} /> : <span className="spin" />}</div>}
+      {tab === "preview" && (d.file
+        ? <div className="pagesbox orig-body"><OriginalFile doc={d} /></div>
+        : <div className="pagesbox">{full ? <Pages doc={full} onBookmark={(page, block) => bookmarkPassage(full, page, block)} /> : <span className="spin" />}</div>)}
       {tab === "text" && (
         <>
           <div className="row between"><p className="sm muted">{d.fileType === "scan" ? `Text from the OCR layer (${d.ocr}% confidence). Check against the scan before relying on figures.` : "Text extracted from the file. This is what the assistant searches."}</p>

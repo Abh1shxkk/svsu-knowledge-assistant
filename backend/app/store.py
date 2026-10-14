@@ -1,5 +1,5 @@
 """The app's data in PostgreSQL: JSON records grouped by kind, plus password hashes."""
-from sqlalchemy import Column, Integer, String, Table, UniqueConstraint, case, cast, func, literal_column, select, Text
+from sqlalchemy import Column, Integer, LargeBinary, String, Table, UniqueConstraint, case, cast, func, literal_column, select, Text
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from .database import engine, meta
@@ -28,7 +28,15 @@ secrets = Table(
     Column("value", Text, nullable=False),
     Column("meta", JSONB, nullable=False),  # who set it and when, shown without the value
 )
-meta.create_all(engine, tables=[records, credentials, secrets])
+# Original uploaded files, keyed by a hash of their content (the same file is stored once).
+files = Table(
+    "files", meta,
+    Column("key", String(64), primary_key=True),
+    Column("name", String(255), nullable=False),
+    Column("mime", String(100), nullable=False),
+    Column("data", LargeBinary, nullable=False),
+)
+meta.create_all(engine, tables=[records, credentials, secrets, files])
 
 
 # Lists leave out each document's full text ("pages"); get() returns it, one document at a time.
@@ -114,3 +122,26 @@ def set_secret(name: str, value: str, meta: dict) -> None:
 def delete_secret(name: str) -> None:
     with engine.begin() as c:
         c.execute(secrets.delete().where(secrets.c.name == name))
+
+
+def put_file(key: str, name: str, mime: str, data: bytes) -> None:
+    stmt = insert(files).values(key=key, name=name, mime=mime, data=data)
+    with engine.begin() as c:
+        c.execute(stmt.on_conflict_do_nothing(index_elements=["key"]))
+
+
+def get_file(key: str) -> tuple[str, str, bytes] | None:
+    """(name, mime, data)"""
+    with engine.connect() as c:
+        row = c.execute(select(files.c.name, files.c.mime, files.c.data).where(files.c.key == key)).first()
+    return tuple(row) if row else None
+
+
+def has_file(key: str) -> bool:
+    with engine.connect() as c:
+        return c.scalar(select(files.c.key).where(files.c.key == key)) is not None
+
+
+def delete_file(key: str) -> None:
+    with engine.begin() as c:
+        c.execute(files.delete().where(files.c.key == key))

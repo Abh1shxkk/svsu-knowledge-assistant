@@ -131,7 +131,7 @@ export function AddRevisionModal({ doc }: { doc: Doc }) {
       const id = nid("D"), by = me(s).name;
       const rev: Doc = {
         ...doc, id, status: "Pending", effective, revisionOf: doc.id, supersededBy: null, related: [], withdrawReason: undefined,
-        pages: res.pages, fileType: res.kind, ocr: res.ocr ?? undefined, sample: false, uploadedBy: by, uploadedOn: todayIso(),
+        pages: res.pages, file: res.file, fileType: res.kind, ocr: res.ocr ?? undefined, sample: false, uploadedBy: by, uploadedOn: todayIso(),
         lang: res.pages.some((p) => p.some((b) => isHindi(blockText(b.text)))) ? "hi" : "en",
         versions: [...doc.versions, { v, date: todayIso(), by, note }],
         approvals: [{ step: "Revision submitted for approval", by, date: todayIso(), kind: "", note: `${note} (from ${file.name})` }],

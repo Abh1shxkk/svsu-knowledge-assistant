@@ -36,6 +36,7 @@ export type KeyStatus = { source: "admin" | "env" | "none"; last4: string; by?: 
 export type Extracted = {
   kind: FileKind; pages: Block[][]; ocr: number | null; ocr_engine: string | null; suggestion: Record<string, unknown>;
   duplicate: { id: string; title: string; ref: string; status: string } | null;
+  file: { key: string; name: string; mime: string };
 };
 
 export type SessionUser = { login_id: string; name: string; email: string; role: string; dept?: string; dev?: boolean; employee_id?: number };
@@ -55,6 +56,7 @@ export const api = {
     return call<Extracted>("/extract", { method: "POST", body: fd });
   },
   document: (id: string) => call<Doc>(`/documents/${encodeURIComponent(id)}`),
+  originalFile: (id: string) => call<Blob>(`/documents/${encodeURIComponent(id)}/file`),
   search: (q: string) => call<string[]>(`/search?q=${encodeURIComponent(q)}`),
   checks: (id: string) => call<[string, string][]>(`/documents/${encodeURIComponent(id)}/checks`),
   notifications: () => call<Notice[]>("/notifications"),

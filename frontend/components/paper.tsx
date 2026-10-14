@@ -80,7 +80,7 @@ export function Pages({ doc, hl = null, onBookmark, zoom, only }: {
         <div key={pi} className={`paper ${doc.fileType === "scan" ? "scan" : ""}`} data-page={pi + 1} lang={doc.lang}
           style={zoom ? { zoom } : undefined}>
           {doc.fileType === "scan" && <span className="ocrbadge">Scanned · OCR text {doc.ocr}% confidence</span>}
-          {pi === 0 && <Letterhead d={doc} />}
+          {pi === 0 && doc.sample && <Letterhead d={doc} />}
           {doc.fileType === "xlsx"
             ? <Sheet page={page} hl={hl} />
             : page.map((b) => <BlockP key={b.id} b={b} page={pi + 1} hl={hl} onBookmark={onBookmark} />)}

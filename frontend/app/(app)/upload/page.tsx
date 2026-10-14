@@ -14,6 +14,7 @@ type Meta = Partial<Pick<Doc, "title" | "ref" | "type" | "authority" | "dept" | 
 type Item = {
   id: string; name: string; kind: FileKind; pages: Block[][]; ocr?: number | null; ocrEngine?: string | null; meta: Meta;
   status: "processing" | "ready" | "submitted" | "draft"; docId?: string; errors: Record<string, string>; dup?: Extracted["duplicate"];
+  file?: Extracted["file"];
 };
 
 const REQUIRED: [keyof Meta, string][] = [
@@ -43,7 +44,7 @@ export default function UploadPage() {
       setQueue((q) => [...q, item]); setSelId((cur) => cur ?? id);
       try {
         const res = await api.extract(file);
-        update(id, { kind: res.kind, pages: res.pages, ocr: res.ocr, ocrEngine: res.ocr_engine, status: "ready", dup: res.duplicate, meta: { institution: L.INSTS[0], ...(res.suggestion as Meta) } });
+        update(id, { kind: res.kind, pages: res.pages, ocr: res.ocr, ocrEngine: res.ocr_engine, status: "ready", dup: res.duplicate, file: res.file, meta: { institution: L.INSTS[0], ...(res.suggestion as Meta) } });
       } catch (e) { toast((e as Error).message); setQueue((q) => q.filter((x) => x.id !== id)); }
     }
   }
@@ -72,7 +73,7 @@ export default function UploadPage() {
       related: m.related ?? [], revisionOf: m.revRel && m.revRel !== "new" ? m.revDoc ?? null : null, supersededBy: null,
       versions: [{ v: "1.0", date: todayIso(), by, note: "Original upload" }],
       approvals: [{ step: draft ? "Saved as draft" : "Submitted for approval", by, date: todayIso(), kind: "", note: "Uploaded from " + it.name }],
-      pages: it.pages, ...(it.ocr != null ? { ocr: it.ocr } : {}),
+      pages: it.pages, file: it.file, ...(it.ocr != null ? { ocr: it.ocr } : {}),
     };
     if (!await save("documents", doc)) return;
     update(it.id, { status: draft ? "draft" : "submitted", docId: id });

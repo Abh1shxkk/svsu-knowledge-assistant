@@ -11,6 +11,8 @@ export type Doc = {
   versions: { v: string; date: string; by: string; note: string }[]; approvals: Step[];
   /** Full text. Lists leave it out; open a document (useFullDoc) to get it. */
   pages?: Block[][]; ocr?: number; sample?: boolean; uploader_id?: string;
+  /** The original uploaded file (older documents may not have one). */
+  file?: { key: string; name: string; mime: string };
 };
 
 /** owner is the creator's Login ID (set by the server); ownerName is shown. */

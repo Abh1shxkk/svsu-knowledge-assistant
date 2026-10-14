@@ -257,3 +257,22 @@ def test_deleting_a_chat_removes_bookmarks_of_its_answers(client, people):
     assert put(client, v, "bm_answers", {"id": "baB", "chat": "chB", "msg": "m1", "q": "q"}).status_code == 200
     assert client.delete("/records/chats/chB", headers=v).status_code == 200
     assert not any(b["id"] == "baB" for b in client.get("/records", headers=v).json()["bm_answers"])
+
+
+def test_original_file_is_kept_shown_to_permitted_people_and_removed_with_the_document(client, people, admin):
+    up, ap, v = people["Uploader"], people["Approver"], people["Viewer"]
+    raw = b"Original notice text about the library timings."
+    ex = client.post("/extract", headers=up, files={"file": ("notice.txt", io.BytesIO(raw), "text/plain")}).json()
+    assert ex["file"]["name"] == "notice.txt"
+    d = doc("OF1", status="Pending", file=ex["file"])
+    assert put(client, up, "documents", d).status_code == 200
+    assert client.get("/documents/OF1/file", headers=up).content == raw          # their own pending upload
+    assert client.get("/documents/OF1/file", headers=v).status_code == 404       # not published yet
+    assert put(client, ap, "documents", {**d, "status": "Active"}).status_code == 200
+    assert client.get("/documents/OF1/file", headers=v).content == raw
+    fake = doc("OF2", status="Pending", file={"key": "0" * 64, "name": "x.pdf", "mime": "application/pdf"})
+    assert put(client, up, "documents", fake).status_code == 200
+    assert client.get("/documents/OF2/file", headers=up).status_code == 404     # unknown files aren't attached
+    assert client.delete("/records/documents/OF1", headers=admin).status_code == 200
+    from app import store
+    assert not store.has_file(ex["file"]["key"])

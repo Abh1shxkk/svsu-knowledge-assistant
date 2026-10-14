@@ -1,5 +1,6 @@
 """SVSU Knowledge Assistant API."""
 import asyncio
+import hashlib
 import json
 import re
 import uuid
@@ -34,6 +35,12 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="SVSU Knowledge Assistant", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
                    allow_methods=["*"], allow_headers=["*"])
+
+_MIME = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+         ".webp": "image/webp", ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
+         ".csv": "text/csv; charset=utf-8",
+         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 Approver = Depends(auth.require_role(*policy.APPROVERS))
 Admin = Depends(auth.require_role("Administrator"))
@@ -199,6 +206,9 @@ def put_record(kind: str, id: str, data: dict = Body(...), user: dict = Depends(
         if old and "pages" not in data:  # metadata edits from lists that don't carry the text
             data["pages"] = old.get("pages", [])
         data["text_hash"] = extract.text_hash(data.get("pages") or [])
+        f = data.get("file")
+        if f != (old or {}).get("file") and not (isinstance(f, dict) and store.has_file(str(f.get("key", "")))):
+            data["file"] = (old or {}).get("file")  # only files that were really uploaded
         if old is None or old.get("pages") != data.get("pages"):
             rag.index_document(data)  # index first: a failure saves nothing
     store.put(kind, id, data)
@@ -233,6 +243,9 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
     if kind == "documents":
         rag.remove_document(id)
         _forget_document(id)
+        key = (old.get("file") or {}).get("key")
+        if key and not any((d.get("file") or {}).get("key") == key for d in store.list_of("documents")):
+            store.delete_file(key)  # no other document uses this upload
         _audit(user, "Deleted", old.get("title", id))
     return {"ok": True}
 
@@ -255,14 +268,32 @@ def ask(body: Ask, user: dict = Depends(auth.current_user)):
 @app.post("/extract")
 def extract_file(file: UploadFile, user: dict = Depends(auth.require_role(*policy.UPLOADERS))):
     """Plain `def`: FastAPI runs it on a worker thread, so a long OCR job doesn't hold up other people."""
+    raw = file.file.read()
     try:
-        res = extract.extract(file.filename, file.file.read())
+        res = extract.extract(file.filename, raw)
     except ValueError as e:
         raise HTTPException(415, str(e))
+    # Keep the original, so people can open the real document, not just the text read from it.
+    key = hashlib.sha256(raw).hexdigest()
+    mime = _MIME.get(Path(file.filename).suffix.lower(), "application/octet-stream")
+    store.put_file(key, file.filename, mime, raw)
+    res["file"] = {"key": key, "name": file.filename, "mime": mime}
     lists = _setting("lists")
     res["suggestion"] = extract.suggest(res["pages"], file.filename, lists)
     res["duplicate"] = _duplicate(user, extract.text_hash(res["pages"]), res["suggestion"].get("ref", ""))
     return res
+
+
+@app.get("/documents/{doc_id}/file")
+def document_file(doc_id: str, user: dict = Depends(auth.current_user)):
+    """The original uploaded file, for people who may open the document."""
+    f = _visible_doc(user, doc_id).get("file")
+    stored = store.get_file(f["key"]) if f else None
+    if not stored:
+        raise HTTPException(404, "The original file isn't stored for this document.")
+    name, mime, data = stored
+    safe = re.sub(r"[^\w.\- ]", "_", name)
+    return Response(data, media_type=mime, headers={"Content-Disposition": f'inline; filename="{safe}"'})
 
 
 @app.post("/documents/{doc_id}/deadlines")
