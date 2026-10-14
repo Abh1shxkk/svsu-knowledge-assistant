@@ -760,3 +760,8 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .orig-img{max-width:none;height:auto;background:#fff;box-shadow:var(--shadow);border-radius:4px;flex:none}
 .orig-wait{min-height:50vh;display:grid;place-items:center}
 .cstep .q .link{display:block;margin-top:4px}
+/* Phones: the document viewer covers the screen (overrides the desktop panel rule above). */
+@media (max-width:860px){
+  .viewer{position:fixed;inset:0;width:100%;max-width:none;border-radius:0;border:0;z-index:80}
+}
+.card-b .orig-img{max-width:100%}

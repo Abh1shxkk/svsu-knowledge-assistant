@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isAdmin, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages, docText } from "@/components/paper";
-import { DownloadOriginal, OriginalPages } from "@/components/original";
+import { DownloadOriginal, OriginalFile, OriginalPages } from "@/components/original";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Note, Pill, Tabs, DateBox, Due } from "@/components/ui";
@@ -187,9 +187,11 @@ function Overview({ d, full, approver }: { d: Doc; full?: Doc; approver: boolean
         {d.status === "Rejected" && <Note kind="bad"><b>Rejected.</b><p className="sm">{lastNote}</p></Note>}
         <div className="card"><div className="card-h"><h3>First page</h3></div>
           <div className="card-b" style={{ background: "var(--surface-2)", maxHeight: 360, overflow: "hidden" }}>
-            <div style={{ transform: "scale(.52)", transformOrigin: "top left", width: "192%" }}>
-              {full ? <Pages doc={full} only={0} /> : <span className="spin" />}
-            </div>
+            {d.file && !d.file.mime.includes("officedocument")
+              ? <OriginalFile doc={d} page={1} />
+              : <div style={{ transform: "scale(.52)", transformOrigin: "top left", width: "192%" }}>
+                {full ? <Pages doc={full} only={0} /> : <span className="spin" />}
+              </div>}
           </div>
         </div>
       </div>
