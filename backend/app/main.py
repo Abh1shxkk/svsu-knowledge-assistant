@@ -207,7 +207,10 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
         _check_user_change(user, None, old)
         if old.get("login_id"):
             store.delete_credential(str(old["login_id"]))
+            _forget_owner(str(old["login_id"]))
         _audit(user, "Deleted user", f"{old.get('name', '')} ({old.get('login_id', '')})")
+    if kind == "deadlines":
+        _forget_deadline(id)
     store.delete(kind, id)
     if kind == "documents":
         rag.remove_document(id)
@@ -388,6 +391,21 @@ def _log_unanswered(q: str, dept: str, now: datetime, count: bool = True) -> dic
     return u
 
 
+def _forget_deadline(deadline_id: str) -> None:
+    """Remove everyone's reminders for a deleted deadline."""
+    for r in store.list_of("reminders"):
+        if r.get("deadline") == deadline_id:
+            store.delete("reminders", r["id"])
+
+
+def _forget_owner(login_id: str) -> None:
+    """A deleted account's private records (chats, bookmarks, reminders, preferences) go with it."""
+    for kind, items in store.records_of(*policy.OWNED).items():
+        for x in items:
+            if x.get("owner") == login_id:
+                store.delete(kind, x["id"])
+
+
 def _forget_document(doc_id: str) -> None:
     """Remove a deleted document's deadlines and bookmarks, and every reference to it."""
     r = store.records_of("deadlines", "bm_passages", "collections", "conflicts", "documents")
@@ -395,6 +413,8 @@ def _forget_document(doc_id: str) -> None:
         for x in r[kind]:
             if x.get("doc") == doc_id:
                 store.delete(kind, x["id"])
+                if kind == "deadlines":
+                    _forget_deadline(x["id"])
     for c in r["collections"]:
         if doc_id in c.get("docs", []):
             store.put("collections", c["id"], {**c, "docs": [i for i in c["docs"] if i != doc_id]})

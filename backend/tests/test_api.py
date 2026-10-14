@@ -123,3 +123,17 @@ def test_checks_notifications_and_export(client, people):
     r = client.post("/export/docx", headers=people["Viewer"], json={"title": "t", "items": [
         {"q": "q", "answer": {"body": [{"p": "a {1}"}], "cites": [{"doc": "F1", "page": 1, "quote": "x"}]}}]})
     assert r.status_code == 200 and r.content[:2] == b"PK"  # a .docx is a zip file
+
+
+def test_deleting_deadline_or_user_removes_their_private_records(client, people, admin):
+    ap, v = people["Approver"], people["Viewer"]
+    assert put(client, ap, "deadlines", {"id": "dlR", "doc": "F1", "date": "2099-01-01", "title": "x"}).status_code == 200
+    assert put(client, v, "reminders", {"id": "rmR", "deadline": "dlR", "days": 3, "via": []}).status_code == 200
+    assert client.delete("/records/deadlines/dlR", headers=ap).status_code == 200
+    assert client.get("/records", headers=v).json()["reminders"] == []
+    r = client.post("/accounts", headers=admin, json={"login_id": "t-gone", "name": "Gone", "role": "Viewer", "password": "Password-123"})
+    assert r.status_code == 200
+    gone = login(client, "t-gone", "Password-123")
+    assert put(client, gone, "chats", {"id": "chGone", "title": "x", "msgs": []}).status_code == 200
+    assert client.delete("/records/users/us-t-gone", headers=admin).status_code == 200
+    assert not any(c["id"] == "chGone" for c in client.get("/records", headers=admin).json()["chats"])

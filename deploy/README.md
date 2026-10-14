@@ -4,13 +4,8 @@ Runs on the shared test server as three memory-limited containers (database, API
 the server's Caddy, at `https://svsu.54-173-64-109.sslip.io` (`/api` goes to the API).
 
 ## Update the server
-1. **Website** (built on a developer machine; the server is too small to build it):
-   ```bash
-   cd frontend
-   NEXT_DIST_DIR=.next-prod NEXT_PUBLIC_API_URL=/api npx next build
-   # bundle = .next-prod/standalone + .next-prod/static (into .next-prod/static) + public
-   ```
-   Copy the bundle to `~/svsu/deploy/web/` on the server.
+1. **Website** (built on a developer machine; the server is too small to build it), from Git Bash:
+   `KEY=/path/to/key.pem bash deploy/push-web.sh`
 2. **API:** on the server, `cd ~/svsu && git pull && cd deploy && sudo docker compose up -d --build api`.
 
 ## On the server

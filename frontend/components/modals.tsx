@@ -147,10 +147,11 @@ export function DeadlineModal({ docId, deadline }: { docId?: string; deadline?: 
     title: deadline?.title ?? "", date: deadline?.date ?? todayIso(), owner: deadline?.owner ?? "HODs",
     aud: deadline?.aud ?? "Teaching staff", doc: deadline?.doc ?? docId ?? permitted(s)[0]?.id ?? "",
   });
-  const doc = useFullDoc(f.doc);
+  const loaded = useFullDoc(f.doc);
   const submit = async () => {
     if (!f.title.trim() || !f.date || !f.doc) { s.toast("Fill in what, when and the source document"); return; }
-    if (!doc?.pages) { s.toast("Still loading the document…"); return; }
+    const doc = loaded?.pages ? loaded : await s.loadDoc(f.doc);  // may still be loading if picked just now
+    if (!doc?.pages) { s.toast("Couldn't open that document"); return; }
     // A new deadline points at the document's first paragraph; an edited one keeps its passage.
     const b = doc.pages[0]?.find((x) => x.kind !== "subj") ?? doc.pages[0]?.[0];
     const keep = deadline && deadline.doc === f.doc;
@@ -171,7 +172,7 @@ export function DeadlineModal({ docId, deadline }: { docId?: string; deadline?: 
       <Field label="Source document" htmlFor="ad-doc"><select className="inp" id="ad-doc" value={f.doc} onChange={(e) => set({ doc: e.target.value })}>
         {permitted(s).map((d) => <option key={d.id} value={d.id}>{d.ref} — {d.title}</option>)}</select></Field>
       <Field label="Applies to" htmlFor="ad-a"><input className="inp" id="ad-a" value={f.aud} onChange={(e) => set({ aud: e.target.value })} /></Field>
-      {doc?.pages && deadline?.doc === f.doc && <p className="xs muted">Linked passage: “{blockText(doc.pages[deadline.page - 1]?.find((b) => b.id === deadline.block)?.text ?? "").slice(0, 120)}”</p>}
+      {loaded?.pages && deadline?.doc === f.doc && <p className="xs muted">Linked passage: “{blockText(loaded.pages[deadline.page - 1]?.find((b) => b.id === deadline.block)?.text ?? "").slice(0, 120)}”</p>}
       <ModalFoot><button className="btn" onClick={close} type="button">Cancel</button><button className="btn pri" onClick={submit} type="button">{deadline ? "Save deadline" : "Add deadline"}</button></ModalFoot>
     </>
   );
