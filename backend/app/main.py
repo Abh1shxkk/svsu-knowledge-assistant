@@ -10,7 +10,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import auth, export, extract, notices, policy, rag, store
+from . import auth, export, extract, llm, notices, policy, rag, store
 from .config import settings
 
 
@@ -317,6 +317,42 @@ def rename_tag(body: TagRename, admin: dict = Admin):
             store.put("documents", d["id"], {**full, "tags": [new if t == body.old else t for t in full["tags"]]})
     _audit(admin, "Renamed tag", f"{body.old} → {new}")
     return {"ok": True}
+
+
+class ApiKey(BaseModel):
+    key: str
+
+
+def _key_status() -> dict:
+    """What the Administration screen shows: never the key itself, only its last 4 characters."""
+    key, source = llm.api_key()
+    saved = store.get_secret(llm.KEY_NAME)
+    return {"source": source, "last4": key[-4:] if key else "", **(saved[1] if saved else {})}
+
+
+@app.get("/admin/openai-key")
+def openai_key_status(admin: dict = Admin):
+    return _key_status()
+
+
+@app.put("/admin/openai-key")
+def set_openai_key(body: ApiKey, admin: dict = Admin):
+    key = body.key.strip()
+    if not key.startswith("sk-") or len(key) < 20 or any(c.isspace() for c in key):
+        raise HTTPException(400, "That doesn't look like an OpenAI API key (they start with sk-).")
+    if err := llm.check_key(key):
+        raise HTTPException(400, err)
+    store.set_secret(llm.KEY_NAME, key, {"by": admin.get("name") or admin.get("login_id"), "at": _stamp(datetime.now())})
+    _audit(admin, "Changed OpenAI API key", f"key ending {key[-4:]}")
+    return _key_status()
+
+
+@app.delete("/admin/openai-key")
+def remove_openai_key(admin: dict = Admin):
+    """Go back to the key in the server's .env file."""
+    store.delete_secret(llm.KEY_NAME)
+    _audit(admin, "Removed OpenAI API key", "using the server's .env key")
+    return _key_status()
 
 
 @app.get("/notifications")

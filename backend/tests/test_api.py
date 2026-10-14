@@ -137,3 +137,20 @@ def test_deleting_deadline_or_user_removes_their_private_records(client, people,
     assert put(client, gone, "chats", {"id": "chGone", "title": "x", "msgs": []}).status_code == 200
     assert client.delete("/records/users/us-t-gone", headers=admin).status_code == 200
     assert not any(c["id"] == "chGone" for c in client.get("/records", headers=admin).json()["chats"])
+
+
+def test_openai_key_is_admin_only_and_never_returned(client, people, admin, monkeypatch):
+    from app import llm
+    monkeypatch.setattr(llm, "check_key", lambda k: None if k.endswith("good") else "OpenAI rejected this key.")
+    key = "sk-test-" + "x" * 30 + "good"
+    for who in ("Approver", "Uploader", "Viewer"):
+        assert client.get("/admin/openai-key", headers=people[who]).status_code == 403
+        assert client.put("/admin/openai-key", headers=people[who], json={"key": key}).status_code == 403
+    assert client.put("/admin/openai-key", headers=admin, json={"key": "not-a-key"}).status_code == 400
+    assert client.put("/admin/openai-key", headers=admin, json={"key": "sk-" + "y" * 30 + "bad"}).status_code == 400
+    r = client.put("/admin/openai-key", headers=admin, json={"key": key})
+    assert r.status_code == 200 and r.json()["source"] == "admin" and r.json()["last4"] == "good"
+    assert llm.api_key() == (key, "admin")  # used for answers from now on
+    leaked = client.get("/records", headers=admin).text + client.get("/admin/openai-key", headers=admin).text
+    assert key not in leaked
+    assert client.delete("/admin/openai-key", headers=admin).json()["source"] != "admin"

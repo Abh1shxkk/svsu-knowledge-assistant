@@ -31,6 +31,8 @@ const jsonBody = (method: string, body: unknown): RequestInit => ({
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
 
+export type KeyStatus = { source: "admin" | "env" | "none"; last4: string; by?: string; at?: string };
+
 export type Extracted = {
   kind: FileKind; pages: Block[][]; ocr: number | null; ocr_engine: string | null; suggestion: Record<string, unknown>;
   duplicate: { id: string; title: string; ref: string; status: string } | null;
@@ -59,6 +61,10 @@ export const api = {
   reportSummary: () => call<{ month: number; cited: number; weeks: { label: string; value: number }[] }>("/reports/summary"),
   requestDoc: (q: string, dept: string, note: string) => call<{ ok: boolean }>("/unanswered/request", jsonBody("POST", { q, dept, note })),
   renameTag: (old: string, next: string) => call<{ ok: boolean }>("/admin/tags/rename", jsonBody("POST", { old, new: next })),
+  /** Administrators only. The key itself never comes back, only its last 4 characters. */
+  keyStatus: () => call<KeyStatus>("/admin/openai-key"),
+  setKey: (key: string) => call<KeyStatus>("/admin/openai-key", jsonBody("PUT", { key })),
+  removeKey: () => call<KeyStatus>("/admin/openai-key", { method: "DELETE" }),
   exportDocx: (title: string, items: { q: string; answer: Answer }[]) => call<Blob>("/export/docx", jsonBody("POST", { title, items })),
   deadlines: (docId: string) => call<Omit<Deadline, "id" | "dept">[]>(`/documents/${docId}/deadlines`, { method: "POST" }),
   createAccount: (a: { login_id: string; name: string; email: string; dept: string; role: string; password: string }) =>

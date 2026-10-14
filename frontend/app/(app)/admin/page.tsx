@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, type KeyStatus } from "@/lib/api";
 import { aiSettings, lists, roleMatrix, useStore } from "@/lib/store";
 import { initials } from "@/lib/util";
 import { Icon } from "@/components/icon";
@@ -98,6 +98,7 @@ export default function AdminPage() {
 
       {tab === "audit" && <AuditLog />}
 
+      {tab === "ai" && <OpenAiKey />}
       {tab === "ai" && (
         <div className="card"><div className="card-h"><h3>Answer behaviour</h3></div>
           {([
@@ -170,6 +171,45 @@ function EditUser({ u }: { u: User }) {
       <p className="xs muted">Login ID {u.login_id} can&apos;t be changed. Change the role in the table.</p>
       <ModalFoot><button className="btn" onClick={s.closeModal} type="button">Cancel</button><button className="btn pri" onClick={submit} type="button">Save</button></ModalFoot>
     </>
+  );
+}
+
+/** The OpenAI API key the assistant uses. Typed in once; afterwards only its last 4 characters are shown. */
+function OpenAiKey() {
+  const { toast } = useStore.getState();
+  const [status, setStatus] = useState<KeyStatus | null>(null);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { api.keyStatus().then(setStatus).catch((e) => setError((e as Error).message)); }, []);
+  const run = async (action: () => Promise<KeyStatus>, done: string) => {
+    setBusy(true); setError("");
+    try { setStatus(await action()); setKey(""); toast(done); } catch (e) { setError((e as Error).message); }
+    setBusy(false);
+  };
+  const where = !status ? "Checking…"
+    : status.source === "admin" ? `Using the key ending ••••${status.last4}, saved by ${status.by} on ${status.at}.`
+      : status.source === "env" ? `Using the key from the server's settings file, ending ••••${status.last4}.`
+        : "No key is set. The assistant can't answer questions or read uploads until one is added.";
+  return (
+    <div className="card"><div className="card-h"><h3>OpenAI API key</h3>
+      {status && <span className={`pill ${status.source === "none" ? "bad" : "ok"}`}>{status.source === "none" ? "Not set" : "Connected"}</span>}</div>
+      <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <p className="sm">{where}</p>
+        <form className="row" style={{ flexWrap: "nowrap" }} onSubmit={(e) => { e.preventDefault(); if (key.trim()) void run(() => api.setKey(key), "API key saved. The assistant uses it from now on."); }}>
+          <input className="inp" type="password" autoComplete="off" spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)}
+            placeholder={status?.source === "none" ? "Paste the API key (sk-…)" : "Paste a new key to replace it"} aria-label="New OpenAI API key" />
+          <button className="btn pri" type="submit" disabled={busy || !key.trim()}>{busy ? "Checking…" : "Save key"}</button>
+        </form>
+        {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
+        <p className="xs muted">The key is checked with OpenAI before it is saved, stored on the server only and never shown again.
+          Create or revoke keys at platform.openai.com → API keys.</p>
+        {status?.source === "admin" && (
+          <div><button className="btn sm" type="button" disabled={busy} onClick={() => void run(api.removeKey, "Saved key removed")}>Remove saved key</button>
+            <span className="xs muted"> Goes back to the key in the server&apos;s settings file, if there is one.</span></div>
+        )}
+      </div>
+    </div>
   );
 }
 

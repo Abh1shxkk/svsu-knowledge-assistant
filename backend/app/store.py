@@ -21,7 +21,14 @@ credentials = Table(
     Column("login_id", String(64), primary_key=True),
     Column("hash", String(200), nullable=False),
 )
-meta.create_all(engine, tables=[records, credentials])
+# Service keys set in Administration (e.g. the OpenAI key). Like credentials: never in records_of().
+secrets = Table(
+    "secrets", meta,
+    Column("name", String(64), primary_key=True),
+    Column("value", Text, nullable=False),
+    Column("meta", JSONB, nullable=False),  # who set it and when, shown without the value
+)
+meta.create_all(engine, tables=[records, credentials, secrets])
 
 
 # Lists leave out each document's full text ("pages"); get() returns it, one document at a time.
@@ -86,3 +93,20 @@ def set_credential(login_id: str, hash: str) -> None:
 def delete_credential(login_id: str) -> None:
     with engine.begin() as c:
         c.execute(credentials.delete().where(credentials.c.login_id == str(login_id)))
+
+
+def get_secret(name: str) -> tuple[str, dict] | None:
+    with engine.connect() as c:
+        row = c.execute(select(secrets.c.value, secrets.c.meta).where(secrets.c.name == name)).first()
+    return (row.value, row.meta) if row else None
+
+
+def set_secret(name: str, value: str, meta: dict) -> None:
+    stmt = insert(secrets).values(name=name, value=value, meta=meta)
+    with engine.begin() as c:
+        c.execute(stmt.on_conflict_do_update(index_elements=["name"], set_={"value": value, "meta": meta}))
+
+
+def delete_secret(name: str) -> None:
+    with engine.begin() as c:
+        c.execute(secrets.delete().where(secrets.c.name == name))

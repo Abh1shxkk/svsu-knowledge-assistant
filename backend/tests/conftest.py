@@ -44,7 +44,7 @@ def client():
     rag.embed = fake_embed
     rag.chat = extract.chat = fake_chat
     with engine.begin() as c:
-        c.execute(text("TRUNCATE records, credentials, blocks"))
+        c.execute(text("TRUNCATE records, credentials, blocks, secrets"))
     with TestClient(main.app) as c:
         yield c
 
