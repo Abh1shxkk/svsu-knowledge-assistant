@@ -42,7 +42,7 @@
   --r:16px; --ease:cubic-bezier(.2,.8,.2,1);
 }
 html,body{height:100%}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.5;overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:14px;line-height:1.5;overflow:hidden}
 *{box-sizing:border-box}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -610,13 +610,6 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}}
 
 /* Login */
-.login{min-height:100dvh;display:grid;place-items:center;padding:24px;background:var(--bg);overflow:auto}
-.login-card{width:min(400px,100%);padding:30px;display:flex;flex-direction:column;gap:14px;border-radius:24px}
-.login-brand{display:flex;gap:12px;align-items:center;margin-bottom:6px}
-.login-brand img{width:44px;height:44px;border-radius:12px;background:#fff;padding:3px;border:1px solid var(--line)}
-.login-brand b{display:block;font-size:14px;font-weight:600}.login-brand span{font-size:12px;color:var(--fg-3)}
-.login h1{font-size:26px;margin-top:4px}
-.login .btn.pri{height:44px;justify-content:center}
 .app-loading{min-height:100dvh;display:grid;place-items:center;background:var(--bg);padding:24px}
 .sqlbox{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:8px 12px;margin-top:4px}
 .sqlbox summary{cursor:pointer;font-size:12px;color:var(--fg-3)}
@@ -709,3 +702,36 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .app.collapsed .me-link{flex:none;justify-content:center}
 .top a.uav{text-decoration:none}
 .noaccess{max-width:520px;margin:60px auto;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+
+/* ---------- Login: university side (left) + sign-in (right) ---------- */
+.login{height:100dvh;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);background:var(--bg);overflow:auto}
+.login-art{position:relative;overflow:hidden;background:#173f4c;color:#fff;padding:40px 48px;display:flex;flex-direction:column;justify-content:space-between;gap:32px;min-height:100dvh}
+.login-graffiti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.login-graffiti text{font-family:var(--f-doc);font-weight:600;fill:none;stroke:rgba(255,255,255,.13);stroke-width:2;letter-spacing:-.02em}
+.login-graffiti text.fill{fill:rgba(255,255,255,.05)}
+.login-graffiti text[lang="hi"]{font-family:var(--font-hi-serif),var(--f-doc)}
+.login-graffiti circle,.login-graffiti path{fill:none;stroke:rgba(242,193,78,.28);stroke-width:3;stroke-dasharray:2 10;stroke-linecap:round}
+.login-art>*:not(.login-graffiti){position:relative}
+.login-art-top{display:flex;gap:14px;align-items:center}
+.login-art-top img{width:52px;height:52px;border-radius:14px;background:#fff;padding:4px}
+.login-art-top b{display:block;font-size:15px;font-weight:600}.login-art-top span{font-size:12.5px;opacity:.75}
+.login-art-mid{max-width:460px;display:flex;flex-direction:column;gap:14px}
+.login-art-mid h2{font-family:var(--f-doc);font-size:clamp(30px,3.4vw,42px);line-height:1.1;font-weight:600;letter-spacing:-.02em}
+.login-art-mid p{font-family:var(--font-hi-serif),var(--f-doc);font-size:17px;line-height:1.6;opacity:.88}
+.login-art-mid ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.login-art-mid li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.45;opacity:.92}
+.login-art-mid li svg{flex:none;margin-top:2px;color:#f2c14e}
+.login-art-foot{font-size:12px;opacity:.6}
+.login-side{display:grid;place-items:center;padding:32px 24px}
+.login-card{width:min(400px,100%);display:flex;flex-direction:column;gap:14px}
+.login-card h1{font-size:28px;margin-top:4px}
+.login-card .btn.pri{height:46px;justify-content:center}
+.login-brand{display:none;gap:12px;align-items:center;margin-bottom:6px}
+.login-brand img{width:44px;height:44px;border-radius:12px;background:#fff;padding:3px;border:1px solid var(--line)}
+.login-brand b{display:block;font-size:14px;font-weight:600}.login-brand span{font-size:12px;color:var(--fg-3)}
+@media (max-width:860px){
+  .login{grid-template-columns:1fr}
+  .login-art{min-height:auto;padding:24px 20px;gap:0}
+  .login-art-mid,.login-art-foot{display:none}
+  .login-side{padding:28px 16px 40px;place-items:start center}
+}

@@ -45,28 +45,67 @@ export default function LoginPage() {
 
   return (
     <div className="login">
-      <form className="login-card card" onSubmit={submit}>
-        <div className="login-brand">
+      <aside className="login-art" aria-label="About the assistant">
+        <Graffiti />
+        <div className="login-art-top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="SVSU logo" />
-          <div><b>SVSU Knowledge Assistant</b><span>Swami Vivekanand Subharti University</span></div>
+          <img src="/logo.png" alt="" />
+          <div><b>Swami Vivekanand Subharti University</b><span>Subhartipuram, Meerut · Uttar Pradesh</span></div>
         </div>
-        <h1>Sign in</h1>
-        <p className="muted sm">Sign in with the Login ID and password your administrator gave you.</p>
-        <div className="fld">
-          <label htmlFor="u">Login ID</label>
-          <input className="inp" id="u" value={loginId} onChange={(e) => setU(e.target.value)} autoComplete="username" placeholder="e.g. 636325823" required autoFocus />
+        <div className="login-art-mid">
+          <h2>SVSU Knowledge Assistant</h2>
+          <p lang="hi">विश्वविद्यालय के पत्र, सूचनाएँ और नीतियाँ — एक जगह, प्रमाण सहित।</p>
+          <ul>
+            <li><Icon n="file" s /> Answers only from the university&apos;s own letters, notices and policies</li>
+            <li><Icon n="check" s /> Every answer cites the exact page and passage</li>
+            <li><Icon n="globe" s /> Ask in Hindi or English</li>
+          </ul>
         </div>
-        <div className="fld">
-          <label htmlFor="p">Password</label>
-          <input className="inp" id="p" type="password" value={password} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required />
-        </div>
-        {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
-        <button className="btn pri" type="submit" disabled={busy} style={{ justifyContent: "center", height: 42 }}>
-          {busy ? <span className="spin" /> : <><Icon n="user" s /> Sign in</>}
-        </button>
-        <p className="xs muted">Accounts are created by an administrator in Administration → Users.</p>
-      </form>
+        <p className="login-art-foot">For staff of Swami Vivekanand Subharti University</p>
+      </aside>
+
+      <main className="login-side">
+        <form className="login-card" onSubmit={submit}>
+          <div className="login-brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="SVSU logo" />
+            <div><b>SVSU Knowledge Assistant</b><span>Swami Vivekanand Subharti University</span></div>
+          </div>
+          <h1>Sign in</h1>
+          <p className="muted sm">Use the Login ID and password your administrator gave you.</p>
+          <div className="fld">
+            <label htmlFor="u">Login ID</label>
+            <input className="inp" id="u" value={loginId} onChange={(e) => setU(e.target.value)} autoComplete="username" placeholder="e.g. 636325823" required autoFocus />
+          </div>
+          <div className="fld">
+            <label htmlFor="p">Password</label>
+            <input className="inp" id="p" type="password" value={password} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required />
+          </div>
+          {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
+          <button className="btn pri" type="submit" disabled={busy}>
+            {busy ? <span className="spin" /> : <><Icon n="user" s /> Sign in</>}
+          </button>
+          <p className="xs muted">No account? Ask an administrator to add you in Administration → Users.</p>
+        </form>
+      </main>
     </div>
+  );
+}
+
+/** Spray-tag style outlined words — Subharti, knowledge and learning in Hindi and English. Decorative only. */
+function Graffiti() {
+  // Kept to the top and bottom bands and the right edge, clear of the text in the middle.
+  const tags: [string, number, number, number, number, string?][] = [  // text, x, y, size, rotate, lang
+    ["सुभारती", 150, 250, 140, -6, "hi"], ["SVSU", 400, 120, 110, 8], ["ज्ञान", 480, 470, 100, -10, "hi"],
+    ["MEERUT", 600, 560, 56, 84], ["विद्या", -10, 870, 120, 6, "hi"], ["knowledge", 250, 950, 84, -4], ["सत्य", 470, 800, 100, 10, "hi"],
+  ];
+  return (
+    <svg className="login-graffiti" viewBox="0 0 640 960" preserveAspectRatio="xMidYMid slice" aria-hidden>
+      {tags.map(([t, x, y, size, r, lang], i) => (
+        <text key={i} x={x} y={y} fontSize={size} transform={`rotate(${r} ${x} ${y})`} lang={lang} className={i % 3 === 0 ? "fill" : ""}>{t}</text>
+      ))}
+      <circle cx="580" cy="300" r="60" /><circle cx="60" cy="900" r="110" />
+      <path d="M-20 280 C 160 230, 300 330, 660 250" /><path d="M-20 720 C 200 690, 360 780, 660 700" />
+    </svg>
   );
 }
