@@ -1,6 +1,8 @@
 /** Monochrome single-series charts (ink on surface), so they work in light and dark mode.
  *  Each shows its value on hover/focus and carries a screen-reader table. */
 
+import Link from "next/link";
+
 type Pt = { label: string; value: number };
 
 const W = 300, H = 120, PAD_B = 18, PAD_T = 16;
@@ -70,25 +72,19 @@ export function BarChart({ points, caption, thin = false }: { points: Pt[]; capt
   );
 }
 
-/** Half-circle tick gauge with the value in the middle, like a dial. */
-export function TickGauge({ percent, label }: { percent: number; label: string }) {
-  const ticks = 36, cx = 110, cy = 104, r1 = 70, r2 = 86;
+/** Horizontal bars with the full label, each a link (e.g. to the library filtered by that subject). */
+export function HBars({ points, caption }: { points: (Pt & { href: string })[]; caption: string }) {
+  const max = Math.max(1, ...points.map((p) => p.value));
   return (
-    <div className="chart" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg viewBox="0 0 220 116" style={{ maxWidth: 260 }} role="img" aria-label={`${label}: ${percent}%`}>
-        {Array.from({ length: ticks + 1 }, (_, i) => {
-          const a = Math.PI - (i / ticks) * Math.PI;
-          const on = i / ticks <= percent / 100;
-          const long = i % 6 === 0;
-          const ri = long ? r1 - 4 : r1;
-          return <line key={i} x1={cx + ri * Math.cos(a)} y1={cy - ri * Math.sin(a)} x2={cx + r2 * Math.cos(a)} y2={cy - r2 * Math.sin(a)}
-            stroke={on ? "var(--chart)" : "var(--line-2)"} strokeWidth={long ? 3 : 2} strokeLinecap="round" />;
-        })}
-        <rect x={cx - 34} y={cy - 46} width="68" height="40" rx="20" fill="var(--chart)" />
-        {/* inline style: the general `.chart text` rule (small, grey axis labels) would otherwise win */}
-        <text x={cx} y={cy - 20} textAnchor="middle" style={{ fill: "var(--accent-ink)", fontSize: 17, fontWeight: 600 }}>{percent}%</text>
-      </svg>
-      <span className="xs muted" style={{ marginTop: 2 }}>{label}</span>
+    <div className="chart hbars">
+      {points.map((p) => (
+        <Link key={p.label} href={p.href} className="hbar" title={`${p.label}: ${p.value}`}>
+          <span className="hbar-l">{p.label}</span>
+          <span className="hbar-t"><i style={{ width: `${(p.value / max) * 100}%` }} /></span>
+          <b>{p.value}</b>
+        </Link>
+      ))}
+      <SrTable caption={caption} points={points} />
     </div>
   );
 }

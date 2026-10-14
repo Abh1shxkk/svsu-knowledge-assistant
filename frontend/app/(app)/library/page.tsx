@@ -14,6 +14,7 @@ type Lib = {
   q: string; subject: string; dept: string; aud: string; type: string; status: string; check: boolean;
   vis: string; from: string; to: string; sort: "new" | "old" | "eff" | "title"; view: "list" | "grid"; showFilters: boolean;
 };
+const NOT_IN_FORCE = ["Superseded", "Withdrawn", "Expired"];
 const BLANK: Lib = { q: "", subject: "", dept: "", aud: "", type: "", status: "", check: false, vis: "", from: "", to: "", sort: "new", view: "list", showFilters: true };
 
 export default function LibraryPage() {
@@ -25,7 +26,7 @@ function Library() {
   const L2 = lists(s);
   const params = useSearchParams();
   // Seed search/status from the link once (e.g. a dashboard KPI or the top-bar search).
-  const [L, setL] = useState<Lib>(() => ({ ...BLANK, q: params.get("q") ?? "", status: params.get("status") ?? "", check: params.has("check") }));
+  const [L, setL] = useState<Lib>(() => ({ ...BLANK, q: params.get("q") ?? "", status: params.get("status") ?? "", subject: params.get("subject") ?? "", check: params.has("check") }));
 
   // Searching the text inside documents happens on the server; the details are matched here too.
   const q = L.q.trim().toLowerCase();
@@ -44,7 +45,8 @@ function Library() {
   if (L.dept) ds = ds.filter((d) => d.dept === L.dept);
   if (L.aud) ds = ds.filter((d) => d.audience.includes(L.aud));
   if (L.type) ds = ds.filter((d) => d.type === L.type);
-  if (L.status) ds = ds.filter((d) => L.status === "Superseded" ? ["Superseded", "Withdrawn"].includes(d.status) : d.status === L.status);
+  if (L.status) ds = ds.filter((d) => L.status === "history" ? NOT_IN_FORCE.includes(d.status)
+    : L.status === "Superseded" ? ["Superseded", "Withdrawn"].includes(d.status) : d.status === L.status);
   if (L.vis) ds = ds.filter((d) => d.visibility === L.vis);
   if (L.from) ds = ds.filter((d) => d.date >= L.from);
   if (L.to) ds = ds.filter((d) => d.date <= L.to);
@@ -86,7 +88,8 @@ function Library() {
           <div className="filters">
             {sel("subject", "Subject", L2.TAGS)}{sel("dept", "Department", L2.DEPTS)}{sel("aud", "Audience", L2.AUDS)}{sel("type", "Document type", L2.TYPES)}
             <div className="fld"><label>Status</label><select className="inp" value={L.status} onChange={(e) => set({ status: e.target.value })}>
-              <option value="">Any</option>{["Active", ...(canUpload(s) ? ["Draft", "Pending", "Changes requested", ...(canApprove(s) ? ["Rejected"] : [])] : []), "Superseded", "Withdrawn", "Expired"].map((v) => <option key={v}>{v}</option>)}</select></div>
+              <option value="">Any</option>{["Active", ...(canUpload(s) ? ["Draft", "Pending", "Changes requested", ...(canApprove(s) ? ["Rejected"] : [])] : []), "Superseded", "Withdrawn", "Expired"].map((v) => <option key={v}>{v}</option>)}
+              <option value="history">No longer in force (all three)</option></select></div>
             {sel("vis", "Visibility", L2.VIS)}
             <div className="fld"><label>Dated from</label><input type="date" className="inp" value={L.from} onChange={(e) => set({ from: e.target.value })} /></div>
             <div className="fld"><label>Dated to</label><input type="date" className="inp" value={L.to} onChange={(e) => set({ to: e.target.value })} /></div>

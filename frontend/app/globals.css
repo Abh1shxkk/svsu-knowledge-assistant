@@ -694,7 +694,7 @@ h1,h2,h3,h4{letter-spacing:-.02em}
   .tiles,.lists2,.statrow{grid-template-columns:1fr 1fr}
   .gsearch{display:none}
 }
-@media (max-width:560px){ .tiles,.lists2,.statrow{grid-template-columns:1fr} }
+@media (max-width:560px){ .tiles,.lists2{grid-template-columns:1fr} .statrow{grid-template-columns:1fr 1fr} }
 @media (prefers-reduced-motion:reduce){ .app,.wrap,.tile,.stat,.kpi,.nav a{transition:none;animation:none} }
 .searched{display:flex;gap:7px;align-items:flex-start;padding:8px 16px 0;font-size:11.5px;color:var(--fg-3)}
 .searched svg{flex:none;margin-top:1px}
@@ -781,3 +781,23 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .mfa-qr{background:#fff;border-radius:8px;padding:6px;border:1px solid var(--line)}
 .mfa-key{font-size:13px;word-break:break-all;margin-top:2px}
 .mfa-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;padding:12px;border:1px dashed var(--line-2);border-radius:8px;font-size:14px}
+
+/* dashboard */
+.hbars{display:flex;flex-direction:column;gap:7px;align-self:stretch;justify-content:center}
+.hbar{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr) 2.2em;align-items:center;gap:10px;font-size:12.5px;color:var(--fg-2);border-radius:6px}
+.hbar:hover{color:var(--fg)}
+.hbar-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbar-t{height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.hbar-t i{display:block;height:100%;background:var(--chart);border-radius:999px;min-width:4px}
+.hbar b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+.tile-empty{flex:1;align-self:center;font-size:13px;color:var(--fg-3);line-height:1.5}
+.tile-list{flex:1;display:flex;flex-direction:column;gap:6px;align-self:stretch;min-width:0}
+.tile-list a{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--fg-2);min-width:0}
+.tile-list a:hover{color:var(--fg)}
+.tile-list a span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile-list a span:last-child{flex:none;color:var(--fg-3);font-size:12px}
+.hero-ask{display:flex;gap:8px;margin-top:16px;max-width:620px}
+.hero-ask .inp{background:rgba(255,255,255,.96);color:#14262b;border-color:transparent;height:42px;font-size:14px}
+.hero-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.hero-chips a{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--hero-fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero-chips a:hover{background:rgba(255,255,255,.18)}
