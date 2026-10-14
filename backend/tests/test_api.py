@@ -387,3 +387,15 @@ def test_big_tables_and_long_paragraphs_are_split_into_searchable_pieces():
     prose = "The committee met on Monday. " * 60
     assert len(_split_long(prose.strip())) > 1
     assert _split_long("A short paragraph.") == ["A short paragraph."]
+
+
+def test_distinctive_words_are_matched_exactly(client, people):
+    """A rare word in the question (here Hindi) finds its paragraph even when meaning-based search doesn't."""
+    from app import rag
+    ap = people["Approver"]
+    common = [[{"id": f"b{i}", "text": f"विश्वविद्यालय परिसर में कार्यक्रम संख्या {i} आयोजित होगा।", "kind": "p"} for i in range(1, 9)]]
+    target = [[{"id": "b1", "text": "मुख्य संयोजक श्री चरण सिंह जी हैं जिनका मोबाईल नं० 09045454765 है।", "kind": "p"}]]
+    assert put(client, ap, "documents", doc("HW1", status="Active", pages=common)).status_code == 200
+    assert put(client, ap, "documents", doc("HW2", status="Active", pages=target)).status_code == 200
+    terms = rag.search_terms(["मुख्य संयोजक कौन हैं?"], ["HW1", "HW2"])
+    assert "संयोजक" in terms and "विश्वविद्यालय" not in terms

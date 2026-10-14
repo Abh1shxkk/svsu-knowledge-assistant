@@ -5,7 +5,7 @@ import json
 import re
 from pgvector.sqlalchemy import Vector
 from datetime import date
-from sqlalchemy import Column, Integer, String, Table, Text, case, literal, select, text
+from sqlalchemy import Column, Integer, String, Table, Text, case, func, literal, select, text
 
 from .config import settings
 from .database import engine, meta
@@ -49,6 +49,8 @@ _SYSTEM = (
     "present both. If the excerpts do not answer the question, label Insufficient evidence with an insuff "
     "banner and say what the closest document does cover. If the question is too vague, label Needs "
     "clarification and offer 3 to 5 specific questions in an opts block. Never use outside knowledge. "
+    "Never add up, count or otherwise calculate numbers yourself: give only figures written in the excerpts "
+    "(for example a Total row), and if the figure asked for isn't written, say so. "
     "Never say 'excerpts'; call them documents or records. Write the answer in {lang}."
 )
 
@@ -136,6 +138,26 @@ def exact_terms(queries: list[str]) -> list[str]:
     return sorted(terms)[:8]
 
 
+# Distinctive words (a Hindi word of 3+ letters, an English word of 5+) are matched exactly too, unless
+# they are so common in the documents that matching them says nothing.
+_WORD = re.compile(r"[\u0900-\u097F]{3,}|[A-Za-z]{5,}")
+_COMMON_SHARE = 0.15
+
+
+def search_terms(queries: list[str], ids: list[str]) -> list[str]:
+    """Codes and dates, plus the question's distinctive words: those in at most 15% of the paragraphs."""
+    codes = exact_terms(queries)
+    words = list(dict.fromkeys(w.lower() for q in queries for w in _WORD.findall(q)))[:15]
+    if not words or not ids:
+        return codes
+    with engine.connect() as c:
+        total = c.scalar(select(func.count()).where(blocks.c.doc_id.in_(ids)))
+        share = {w: c.scalar(select(func.count()).where(blocks.c.doc_id.in_(ids), blocks.c.text.ilike(_like(w))))
+                 for w in words}
+    rare = [w for w in words if 0 < share[w] <= max(2, _COMMON_SHARE * total)]
+    return (codes + rare)[:12]
+
+
 def _like(t: str) -> str:
     return "%" + t.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
@@ -196,7 +218,7 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     queries = rewrite(question, list(history))
     vectors = embed(queries)
     ai = ai or {}
-    terms = exact_terms(queries)
+    terms = search_terms(queries, usable(permitted_ids))
     hits = _search_all(vectors, usable(scope_ids), int(ai.get("maxSources") or settings.top_k), terms)
     result = _generate(question, hits, docs, lang, ai.get("histOnly", True) is not False) if hits else dict(_INSUFFICIENT)
     result["queries"] = queries[1:] or queries

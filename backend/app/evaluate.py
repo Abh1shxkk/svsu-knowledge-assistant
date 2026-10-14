@@ -89,7 +89,7 @@ def run(n: int = 50, new: bool = False) -> dict:
         if it["doc_id"] not in docs:  # the document was withdrawn or deleted since the set was made
             continue
         queries = rag.rewrite(it["question"], [])
-        hits = rag._search_all(embed(queries), list(docs), top_k, rag.exact_terms(queries))
+        hits = rag._search_all(embed(queries), list(docs), top_k, rag.search_terms(queries, list(docs)))
         found = any((h["doc_id"], h["page"], h["block"]) == (it["doc_id"], it["page"], it["block"]) for h in hits)
         answer = rag._generate(it["question"], hits, docs, "auto") if hits else dict(rag._INSUFFICIENT)
         said = _flat(answer["body"])
