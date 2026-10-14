@@ -96,7 +96,7 @@ export default function Dashboard() {
               {upcoming.length ? <BarChart points={weeks} caption="Deadlines due per week" thin />
                 : <p className="tile-empty">Nothing due. Open a document and choose <b>Find deadlines</b> to add the dates it sets, or see <Link href="/deadlines">Actions &amp; Deadlines</Link>.</p>}
             </Tile>
-            <Tile title="Expiring soon" chip="Next 30 days" value={expiring.length || undefined} sub="documents">
+            <Tile title="Expiring soon" chip="Next 30 days" value={expiring.length || undefined} sub={expiring.length === 1 ? "document" : "documents"}>
               {expiring.length ? <div className="tile-list">{expiring.slice(0, 5).map((d) => (
                 <Link key={d.id} href={`/library/${d.id}`}><span>{d.title}</span><span>{daysTo(d.expiry!) === 0 ? "today" : `in ${plural(daysTo(d.expiry!), "day")}`}</span></Link>))}</div>
                 : <p className="tile-empty">No active document expires in the next 30 days. Expired documents are kept and used only as history.</p>}
@@ -164,7 +164,7 @@ function ForYou() {
   const soon = ds.filter((d) => d.status === "Active" && d.expiry && daysTo(d.expiry) >= 0 && daysTo(d.expiry) <= 7).length;
   if (canApprove(s)) {
     add(pending, { href: "/review", icon: "check", title: `${plural(pending, "document")} waiting for review`, meta: "Approve, request changes or reject", action: "Review" });
-    add(soon, { href: "/library?status=Active", icon: "clock", title: `${plural(soon, "document")} expire this week`, meta: "Publish a replacement if the rule still applies", action: "Open" });
+    add(soon, { href: "/library?status=Active", icon: "clock", title: `${plural(soon, "document")} ${soon === 1 ? "expires" : "expire"} this week`, meta: "Publish a replacement if the rule still applies", action: "Open" });
   }
   const changes = mine.filter((d) => d.status === "Changes requested").length;
   const drafts = mine.filter((d) => d.status === "Draft").length;

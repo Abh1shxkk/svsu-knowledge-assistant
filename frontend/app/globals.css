@@ -797,7 +797,7 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .tile-list a span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tile-list a span:last-child{flex:none;color:var(--fg-3);font-size:12px}
 .hero-ask{display:flex;gap:8px;margin-top:16px;max-width:620px}
-.hero-ask .inp{background:rgba(255,255,255,.96);color:#14262b;border-color:transparent;height:42px;font-size:14px}
+.hero-ask .inp{flex:1;min-width:0;background:rgba(255,255,255,.96);color:#14262b;border-color:transparent;height:42px;font-size:14px}
 .hero-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .hero-chips a{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--hero-fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hero-chips a:hover{background:rgba(255,255,255,.18)}
