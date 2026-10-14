@@ -71,8 +71,10 @@ jobs:
           rm -rf web.old && { [ -d web ] && mv web web.old || true; } && mv web.new web   # web.old = rollback
           sudo docker compose up -d --build --remove-orphans
           sudo docker compose restart web
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8097/health >/dev/null && break; sleep 2; done
-          curl -sf http://127.0.0.1:8097/health && curl -sf -o /dev/null http://127.0.0.1:3097/login
+          for url in http://127.0.0.1:8097/health http://127.0.0.1:3097/login; do   # both may still be starting
+            for i in $(seq 1 30); do curl -sf -o /dev/null "$url" && break; sleep 2; done
+            curl -sf -o /dev/null "$url" && echo "ok: $url"
+          done
           sudo docker image prune -f --filter label=com.docker.compose.project=svsu >/dev/null   # only our old images
           echo " deployed $1"
           EOF
