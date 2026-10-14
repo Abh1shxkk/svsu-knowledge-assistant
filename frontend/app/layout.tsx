@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans_Devanagari, Noto_Serif_Devanagari, Source_Serif_4 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
-const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
-const hindi = Noto_Sans_Devanagari({ subsets: ["devanagari"], weight: ["400", "500", "600"], variable: "--font-hi" });
-const serif = Source_Serif_4({ subsets: ["latin"], variable: "--font-serif" }); // official document pages only
-const hindiSerif = Noto_Serif_Devanagari({ subsets: ["devanagari"], weight: ["400", "600"], variable: "--font-hi-serif" });
+// Bundled in app/fonts (OFL-1.1), so builds never depend on downloading fonts from Google.
+const geist = localFont({ src: "./fonts/geist-latin-wght-normal.woff2", weight: "100 900", variable: "--font-geist" });
+const mono = localFont({ src: "./fonts/geist-mono-latin-wght-normal.woff2", weight: "100 900", variable: "--font-mono" });
+const hindi = localFont({ src: "./fonts/noto-sans-devanagari-devanagari-wght-normal.woff2", weight: "100 900", variable: "--font-hi" });
+const serif = localFont({ src: "./fonts/source-serif-4-latin-wght-normal.woff2", weight: "200 900", variable: "--font-serif" }); // document pages
+const hindiSerif = localFont({ src: "./fonts/noto-serif-devanagari-devanagari-wght-normal.woff2", weight: "100 900", variable: "--font-hi-serif" });
 
 export const metadata: Metadata = {
   title: "SVSU Knowledge Assistant",
