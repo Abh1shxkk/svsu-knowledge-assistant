@@ -373,3 +373,17 @@ def test_quality_judge_reads_tables_and_lists():
     from app.evaluate import _flat
     body = [{"p": "Schedule:"}, {"ul": ["Item one"]}, {"table": {"head": ["Date", "Subject"], "rows": [["14/10/2026", "Cataloguing"]]}}]
     assert _flat(body).split(chr(10)) == ["Schedule:", "Item one", "Date | Subject", "14/10/2026 | Cataloguing"]
+
+
+def test_big_tables_and_long_paragraphs_are_split_into_searchable_pieces():
+    from app.extract import _CHUNK, _split_long
+    header = "College | Students | Faculty | Total"
+    table = "\n".join([header] + [f"College number {i} of the university | {100 + i} | 05 | {105 + i}" for i in range(40)])
+    pieces = _split_long(table)
+    assert len(pieces) > 1 and all(p.startswith(header) for p in pieces)        # every piece keeps the headings
+    assert all(len(p) <= _CHUNK + 120 for p in pieces)
+    rows = [ln for p in pieces for ln in p.split(chr(10)) if ln != header]
+    assert len(rows) == 40                                                        # no row lost or repeated
+    prose = "The committee met on Monday. " * 60
+    assert len(_split_long(prose.strip())) > 1
+    assert _split_long("A short paragraph.") == ["A short paragraph."]

@@ -83,7 +83,7 @@ def _search(vector: list[float], ids: list[str], limit: int) -> list[dict]:
     if not ids:
         return []
     dist = blocks.c.embedding.cosine_distance(vector)
-    q = (select(blocks.c.doc_id, blocks.c.page, blocks.c.block, blocks.c.text, (1 - dist).label("score"))
+    q = (select(blocks.c.id, blocks.c.doc_id, blocks.c.page, blocks.c.block, blocks.c.text, (1 - dist).label("score"))
          .where(blocks.c.doc_id.in_(ids)).order_by(dist).limit(limit))
     with engine.connect() as c:
         return [dict(r._mapping) for r in c.execute(q)]
@@ -145,7 +145,7 @@ def _keyword(terms: list[str], ids: list[str], limit: int) -> list[dict]:
     if not terms or not ids:
         return []
     found = sum((case((blocks.c.text.ilike(_like(t)), 1), else_=0) for t in terms), literal(0))
-    q = (select(blocks.c.doc_id, blocks.c.page, blocks.c.block, blocks.c.text, found.label("found"))
+    q = (select(blocks.c.id, blocks.c.doc_id, blocks.c.page, blocks.c.block, blocks.c.text, found.label("found"))
          .where(blocks.c.doc_id.in_(ids), found > 0).order_by(found.desc()).limit(limit))
     with engine.connect() as c:
         return [dict(r._mapping) for r in c.execute(q)]
@@ -166,7 +166,7 @@ def _search_all(vectors: list[list[float]], ids: list[str], limit: int, terms: l
     for r, h in enumerate(_keyword(list(terms), ids, limit * 3)):
         key = (h["doc_id"], h["page"], h["block"])
         rank[key] = rank.get(key, 0) + 1 / (60 + r)
-        best.setdefault(key, {**{k: h[k] for k in ("doc_id", "page", "block", "text")}, "score": 0.0})
+        best.setdefault(key, {**{k: h[k] for k in ("id", "doc_id", "page", "block", "text")}, "score": 0.0})
     picked, per_doc = [], {}
     for h in sorted(best.values(), key=lambda h: -rank[(h["doc_id"], h["page"], h["block"])]):
         if per_doc.get(h["doc_id"], 0) < _PER_DOC:
@@ -217,6 +217,24 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
     return result
 
 
+def _neighbours(hits: list[dict]) -> dict[int, str]:
+    """Each hit's text with the paragraph before and after it in the same document (block ids follow the
+    document's order), so a sentence that continues in the next paragraph still reaches the answer."""
+    ids = [h["id"] for h in hits if h.get("id")]
+    if not ids:
+        return {}
+    wanted = {i + d for i in ids for d in (-1, 0, 1)}
+    with engine.connect() as c:
+        rows = {r.id: r for r in c.execute(select(blocks.c.id, blocks.c.doc_id, blocks.c.text).where(blocks.c.id.in_(wanted)))}
+    out = {}
+    for h in hits:
+        i = h.get("id")
+        if i in rows:
+            parts = [rows[j].text for j in (i - 1, i, i + 1) if j in rows and rows[j].doc_id == rows[i].doc_id]
+            out[i] = "\n".join(parts)
+    return out
+
+
 def _text(x) -> str:
     """The model sometimes wraps a string in an object ({"question": "..."}); the screens need plain text."""
     if isinstance(x, str):
@@ -252,10 +270,12 @@ def _clean_banner(b) -> dict | None:
 
 
 def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True) -> dict:
+    around = _neighbours(hits)
+
     def excerpt(n, p):
         d = docs[p["doc_id"]]
         dates = f"effective {d.get('effective') or '?'}" + (f" to {d['expiry']}" if d.get("expiry") else "")
-        return f"[{n}] \"{d['title']}\" ({d['ref']}; {d['status']}; {dates}; page {p['page']})\n{p['text']}"
+        return f"[{n}] \"{d['title']}\" ({d['ref']}; {d['status']}; {dates}; page {p['page']})\n{around.get(p.get('id'), p['text'])}"
 
     system = _SYSTEM.replace("{lang}", LANGS.get(lang, LANGS["auto"])).replace("{history_rule}", _HISTORY_RULES[hist_only])
     res = chat(system,
@@ -284,7 +304,7 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
         p = hits[n - 1]
         quote = quotes.get(n) or ""
         cites.append({"doc": p["doc_id"], "page": p["page"], "block": p["block"],
-                      "quote": quote if quote and quote in p["text"] else p["text"][:160]})
+                      "quote": quote if quote and quote in p["text"] else p["text"][:160]})  # quotes from the context fall back
     return {"source": "documents", "label": res.get("label") if res.get("label") in LABELS else "One source",
             "banner": _clean_banner(res.get("banner")), "body": json.loads(text), "cites": cites,
             "follow": [t for t in map(_text, res.get("follow") or []) if t][:3]}

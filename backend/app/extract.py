@@ -27,6 +27,7 @@ _MIME = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", "
          ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 _MAX_OCR_PAGES = 10
 _FRAGMENT = 25  # characters: shorter paragraphs are joined to their neighbour
+_CHUNK = 700     # characters: longer paragraphs and tables are split into pieces about this size
 
 
 def check_supported(filename: str) -> str:
@@ -170,10 +171,33 @@ def _join_fragments(page: list) -> list:
     return out
 
 
+def _split_long(text: str) -> list[str]:
+    """A long paragraph's meaning gets blurred in search, and one row of a big table gets lost in it.
+    Split it into pieces of about _CHUNK characters at line (or sentence) breaks; a table's pieces each
+    start with its column headings, so every piece still says what its numbers mean."""
+    if len(text) <= _CHUNK * 1.4:
+        return [text]
+    lines = text.split("\n")
+    rows = [ln for ln in lines if " | " in ln]
+    header = rows[0] if len(rows) >= 3 else None
+    if len(lines) < 3:  # one long line: break at sentences instead
+        lines = [s + "." for s in text.split(". ") if s.strip()]
+    pieces, cur = [], []
+    for ln in lines:
+        if cur and len("\n".join(cur)) + len(ln) > _CHUNK:
+            pieces.append(cur)
+            cur = [header] if header and ln != header else []
+        cur.append(ln)
+    if cur:
+        pieces.append(cur)
+    return ["\n".join(p) for p in pieces]
+
+
 def _blocks(pages: list[list]) -> list[list[dict]]:
     """Give every paragraph (or sheet row) an id that is unique within the document."""
     n, out = 0, []
-    for page in map(_join_fragments, pages):
+    split = lambda page: [piece for p in page for piece in (_split_long(p) if isinstance(p, str) else [p])]  # noqa: E731
+    for page in (split(_join_fragments(p)) for p in pages):
         blocks = []
         for text in page:
             n += 1
