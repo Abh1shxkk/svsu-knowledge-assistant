@@ -41,7 +41,7 @@ test("ask only the documents of one department, listed beside the chat", async (
   await expect(page.locator(".side")).toBeVisible();
 
   await page.goto("/collections");
-  await page.locator(".coll.auto", { hasText: DEPT }).click();
+  await page.locator(".csec", { hasText: "By department" }).locator(".coll.auto", { hasText: DEPT }).click();
   await expect(page).toHaveURL(/\/ask\?group=dept/);
 
   const list = page.locator(".dpick");

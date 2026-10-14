@@ -184,9 +184,21 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
     res = chat(system,
                "Excerpts:\n" + "\n\n".join(excerpt(n, h) for n, h in enumerate(hits, 1))
                + f"\n\nQuestion: {question}", as_json=True)
+    # The model's own list of the excerpts it used (numbers may arrive as text).
+    listed = {int(c["excerpt"]): c.get("quote") for c in res.get("cites") or []
+              if isinstance(c, dict) and str(c.get("excerpt", "")).strip().isdigit() and 1 <= int(c["excerpt"]) <= len(hits)}
+    body = res.get("body") or []
+    if listed and not re.search(r"\{\d+\}", json.dumps(body)):
+        # It listed sources but left out the {n} markers: cite them at the end of the answer, never drop them.
+        marks = " " + "".join(f"{{{n}}}" for n in listed)
+        last = next((p for p in reversed(body) if isinstance(p, dict) and isinstance(p.get("p"), str)), None)
+        if last:
+            last["p"] += marks
+        else:
+            body.append({"sub": "Sources:" + marks})
     # Renumber excerpt references {n} as 1, 2, 3… in the order they first appear in the answer.
-    quotes = {c.get("excerpt"): c.get("quote") for c in res.get("cites") or []}
-    text = json.dumps(res.get("body") or [], ensure_ascii=False)
+    quotes = listed
+    text = json.dumps(body, ensure_ascii=False)
     order = list(dict.fromkeys(int(n) for n in re.findall(r"\{(\d+)\}", text) if 1 <= int(n) <= len(hits)))
     text = re.sub(r"\{(\d+)\}", lambda m: f"{{{order.index(int(m[1])) + 1}}}" if int(m[1]) in order else "", text)
     cites = []

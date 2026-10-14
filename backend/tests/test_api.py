@@ -200,3 +200,15 @@ def test_deadlines_and_reminders_need_access_to_the_document(client, people):
     assert put(client, up, "deadlines", {"id": "dlMO", "doc": "MO1", "date": "2099-01-01", "title": "tampered"}).status_code == 404
     assert client.delete("/records/deadlines/dlMO", headers=up).status_code == 404
     assert put(client, v, "reminders", {"id": "rmMO", "deadline": "dlMO", "days": 1, "via": ["Email"]}).status_code == 404
+
+
+def test_answer_keeps_citations_when_the_model_forgets_the_markers(monkeypatch):
+    from app import rag
+    hits = [{"doc_id": "D1", "page": 1, "block": "b1", "text": "Invigilators must report 48 minutes before the session."}]
+    docs = {"D1": {"title": "T", "ref": "R", "status": "Active", "effective": "", "expiry": ""}}
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: {
+        "label": "One source", "body": [{"p": "They report **48 minutes** before."}],
+        "cites": [{"excerpt": "1", "quote": "48 minutes before the session"}], "follow": []})
+    res = rag._generate("q", hits, docs, "en")
+    assert res["body"][0]["p"].endswith("{1}")
+    assert res["cites"] == [{"doc": "D1", "page": 1, "block": "b1", "quote": "48 minutes before the session"}]
