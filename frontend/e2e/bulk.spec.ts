@@ -32,7 +32,8 @@ test("a bulk import is processed in the background and lands in review", async (
     { name: NAMES[1], mimeType: "text/plain", buffer: Buffer.from(`Transport notice ${stamp}. University buses leave the main gate at 5:15 PM on weekdays and at 2 PM on Saturdays.`) },
   ]);
   // Both are read, described and indexed by the server's background worker.
-  await expect(page.locator(".pill.ok", { hasText: "2 imported" })).toBeVisible({ timeout: 180_000 });
+  const newest = page.locator(".card", { hasText: "Imports" }).locator(".li").first();  // newest batch first
+  await expect(newest.locator(".pill.ok", { hasText: "2 imported" })).toBeVisible({ timeout: 180_000 });
   await page.goto("/library?status=Pending");
   await expect(page.getByText(/notice|hours|transport|bus/i).first()).toBeVisible();
   expect(errors).toEqual([]);
