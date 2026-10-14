@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pymupdf
 from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 
 from . import ocr
@@ -34,12 +36,12 @@ def extract(filename: str, raw: bytes) -> dict:
     scans: list[tuple[str, int, str]] = []  # OCR results, one per page image
     if kind == "pdf":
         pdf = pymupdf.open(stream=raw, filetype="pdf")
-        pages = [_paras(p.get_text()) for p in pdf]
+        pages = [_pdf_page(p) for p in pdf]
         if sum(map(len, pages)) == 0:  # no text layer: a scan, so OCR the page images
             scans = [ocr.read(p.get_pixmap(dpi=300).tobytes("png")) for p in list(pdf)[:_MAX_OCR_PAGES]]
             kind, pages = "scan", [_paras(t, keep_lines=True) for t, _, _ in scans]
     elif kind == "docx":
-        pages = _paginate([p.text for p in Document(io.BytesIO(raw)).paragraphs])
+        pages = _paginate(_docx(raw))
     elif kind == "xlsx":
         pages = [_rows(raw, suffix)]
     elif kind == "img":
@@ -52,6 +54,47 @@ def extract(filename: str, raw: bytes) -> dict:
         "ocr": round(sum(c for _, c, _ in scans) / len(scans)) if scans else None,
         "ocr_engine": "+".join(sorted({e for _, _, e in scans})) or None,
     }
+
+
+def _row(cells) -> str:
+    """One table row as "cell | cell"; a merged cell (repeated, or empty) appears once."""
+    out: list[str] = []
+    for c in cells:
+        c = " ".join((c or "").split())
+        if c and (not out or out[-1] != c):
+            out.append(c)
+    return " | ".join(out)
+
+
+def _table(rows) -> str:
+    """A table as one paragraph, one line per row, so a date stays next to its subject."""
+    return "\n".join(r for r in (_row(row) for row in rows) if r)
+
+
+def _pdf_page(page) -> list[str]:
+    """Paragraphs of a PDF page in reading order. Ruled tables come out row by row; read as plain text,
+    many PDFs give a table column by column."""
+    tables = page.find_tables().tables
+    if not tables:
+        return _paras(page.get_text())
+    boxes = [pymupdf.Rect(t.bbox) for t in tables]
+    parts = [(t.bbox[1], _table(t.extract())) for t in tables]
+    parts += [(b[1], " ".join(b[4].split())) for b in page.get_text("blocks")
+              if b[6] == 0 and not any(pymupdf.Rect(b[:4]).intersects(box) for box in boxes)]  # text outside tables
+    return [text for _, text in sorted(parts, key=lambda p: p[0]) if text.strip()]
+
+
+def _docx(raw: bytes) -> list[str]:
+    """Paragraphs and tables in the order they appear (python-docx's .paragraphs skips tables)."""
+    doc = Document(io.BytesIO(raw))
+    out = []
+    for el in doc.element.body.iterchildren():
+        tag = el.tag.rsplit("}", 1)[-1]
+        if tag == "p":
+            out.append(Paragraph(el, doc).text)
+        elif tag == "tbl":
+            out.append(_table([c.text for c in row.cells] for row in Table(el, doc).rows))
+    return out
 
 
 def text_hash(pages: list[list[dict]]) -> str:

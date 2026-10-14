@@ -145,3 +145,13 @@ test("people can't open pages their role doesn't allow", async ({ page }) => {
     await expect(page.getByText("You don't have access to this page")).toBeVisible();
   }
 });
+
+test("an administrator deletes a document for good", async ({ page }) => {
+  await signIn(page, ADMIN);
+  await page.goto("/library");
+  await page.getByText(TITLE).click();
+  await page.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page).toHaveURL(/\/library$/);
+  await expect(page.getByText(TITLE)).toHaveCount(0);
+});

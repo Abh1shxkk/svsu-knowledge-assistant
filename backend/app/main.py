@@ -225,6 +225,10 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
         _audit(user, "Deleted user", f"{old.get('name', '')} ({old.get('login_id', '')})")
     if kind == "deadlines":
         _forget_deadline(id)
+    if kind == "chats":  # bookmarks of its answers go with it
+        for b in store.list_of("bm_answers"):
+            if b.get("chat") == id:
+                store.delete("bm_answers", b["id"])
     store.delete(kind, id)
     if kind == "documents":
         rag.remove_document(id)

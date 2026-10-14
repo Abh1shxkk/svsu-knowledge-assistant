@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
+import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isAdmin, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages, docText } from "@/components/paper";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
@@ -38,6 +38,20 @@ export default function DocDetail() {
     const step = { step: d.status === "Draft" ? "Submitted for approval" : "Resubmitted for approval", by: me(s).name, date: todayIso(), kind: "" as const };
     if (await save("documents", { ...d, status: "Pending", approvals: [...d.approvals, step] })) toast("Submitted for approval");
   };
+  /** Administrators only. Withdraw keeps the record; delete removes it and everything that points at it. */
+  const deleteDoc = () => openModal({
+    title: "Delete document permanently?",
+    body: <>
+      <p>Delete <b>{d.title}</b> ({d.ref})? This removes it from the library and AI answers, along with its
+        text, search data, deadlines, bookmarks, links and reported conflicts, and takes it out of collections.</p>
+      <p className="sm muted" style={{ marginTop: 8 }}>The audit log keeps a note that it was deleted. To keep the record for history, use Withdraw instead.</p>
+    </>,
+    foot: <><button className="btn" onClick={() => useStore.getState().closeModal()} type="button">Cancel</button>
+      <button className="btn danger" type="button" onClick={async () => {
+        useStore.getState().closeModal();
+        if (await useStore.getState().remove("documents", d.id)) { toast("Document deleted"); router.push("/library"); }
+      }}>Delete permanently</button></>,
+  });
   const revision = () => openModal({ title: "Add a revision", body: <AddRevisionModal doc={d} /> });
   const link = () => openModal({ title: "Link a related document", body: <LinkDocModal doc={d} /> });
 
@@ -59,6 +73,7 @@ export default function DocDetail() {
           {approver && (d.status !== "Withdrawn"
             ? <button className="btn danger" onClick={() => openModal({ title: "Withdraw document", body: <WithdrawModal doc={d} /> })} type="button"><Icon n="ban" s /> Withdraw</button>
             : <button className="btn" onClick={restore} type="button">Restore</button>)}
+          {isAdmin(s) && <button className="btn danger" onClick={deleteDoc} type="button"><Icon n="trash" s /> Delete</button>}
         </div>
       </div>
 

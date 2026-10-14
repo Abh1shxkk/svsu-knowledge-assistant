@@ -750,4 +750,9 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .dpick .cited-mark{color:var(--accent);flex:none;margin-top:2px}
 .csec{display:flex;flex-direction:column;gap:12px}
 .coll.auto .ask{color:var(--accent);display:inline-flex;gap:4px;align-items:center;font-weight:500}
-.paper.scan .blk{white-space:pre-line}  /* OCR keeps table rows as separate lines */
+.blk{white-space:pre-line}  /* table rows (from any file) stay on separate lines */
+.hrow{display:flex;align-items:center;gap:2px}
+.hrow .hitem{flex:1;min-width:0}
+.hrow .del{opacity:0;flex:none}
+.hrow:hover .del,.hrow .del:focus-visible{opacity:1}
+@media (hover:none){.hrow .del{opacity:.6}}

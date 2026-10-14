@@ -114,9 +114,12 @@ function Ask() {
             return items.length ? (
               <div key={g}><div className="g">{g}</div>
                 {items.map((c) => (
-                  <button key={c.id} className={`hitem ${c.id === s.activeChat ? "on" : ""}`} onClick={() => { set({ activeChat: c.id }); setHistOpen(false); }} type="button">
-                    <b>{c.title}</b><span>{c.saved && <><Icon n="bm" s /> Saved · </>}{Math.ceil(c.msgs.length / 2)} question{c.msgs.length > 2 ? "s" : ""}</span>
-                  </button>
+                  <div key={c.id} className="hrow">
+                    <button className={`hitem ${c.id === s.activeChat ? "on" : ""}`} onClick={() => { set({ activeChat: c.id }); setHistOpen(false); }} type="button">
+                      <b>{c.title}</b><span>{c.saved && <><Icon n="bm" s /> Saved · </>}{Math.ceil(c.msgs.length / 2)} question{c.msgs.length > 2 ? "s" : ""}</span>
+                    </button>
+                    <button className="iconbtn del" aria-label={`Delete conversation ${c.title}`} title="Delete conversation" onClick={() => deleteChat(c)} type="button"><Icon n="trash" s /></button>
+                  </div>
                 ))}
               </div>
             ) : null;
@@ -165,6 +168,22 @@ function Ask() {
       </section>
     </div>
   );
+
+  function deleteChat(chat: Chat) {
+    openModal({
+      title: "Delete conversation?",
+      body: <p>Delete <b>{chat.title}</b>? Its answers and any bookmarks of them are removed. This can&apos;t be undone.</p>,
+      foot: <><button className="btn" onClick={() => useStore.getState().closeModal()} type="button">Cancel</button>
+        <button className="btn danger" type="button" onClick={async () => {
+          useStore.getState().closeModal();
+          if (useStore.getState().activeChat === chat.id) set({ activeChat: null });
+          if (await useStore.getState().remove("chats", chat.id)) {
+            set({ bm_answers: useStore.getState().bm_answers.filter((b) => b.chat !== chat.id) });
+            toast("Conversation deleted");
+          }
+        }}>Delete</button></>,
+    });
+  }
 
   async function saveChat(chat: Chat) {
     if (await save("chats", { ...chat, saved: !chat.saved, savedName: chat.savedName ?? chat.title }))

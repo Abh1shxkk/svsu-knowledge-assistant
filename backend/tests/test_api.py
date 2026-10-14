@@ -212,3 +212,48 @@ def test_answer_keeps_citations_when_the_model_forgets_the_markers(monkeypatch):
     res = rag._generate("q", hits, docs, "en")
     assert res["body"][0]["p"].endswith("{1}")
     assert res["cites"] == [{"doc": "D1", "page": 1, "block": "b1", "quote": "48 minutes before the session"}]
+
+
+ROWS = [["Date", "Subject", "Time"], ["14/10/2026", "Library Cataloguing", "09:00 AM"], ["15/10/2026", "Library Classification", "02:00 PM"]]
+WANT = "Date | Subject | Time\n14/10/2026 | Library Cataloguing | 09:00 AM\n15/10/2026 | Library Classification | 02:00 PM"
+
+
+def test_word_tables_are_read_row_by_row():
+    from docx import Document
+    from app import extract
+    d = Document()
+    d.add_paragraph("Exam schedule.")
+    t = d.add_table(rows=3, cols=3)
+    for r, row in enumerate(ROWS):
+        for c, v in enumerate(row):
+            t.cell(r, c).text = v
+    buf = io.BytesIO()
+    d.save(buf)
+    texts = [b["text"] for p in extract.extract("t.docx", buf.getvalue())["pages"] for b in p]
+    assert texts == ["Exam schedule.", WANT]  # tables used to be skipped entirely
+
+
+def test_pdf_tables_are_read_row_by_row_even_when_written_column_by_column():
+    import pymupdf
+    from app import extract
+    pdf = pymupdf.open()
+    page = pdf.new_page()
+    page.insert_text((50, 60), "Exam schedule.")
+    xs, y0, rh = [50, 170, 360, 480], 90, 24
+    for col in range(3):
+        for r, row in enumerate(ROWS):
+            page.insert_text((xs[col] + 4, y0 + r * rh + 16), row[col])
+    for r in range(4):
+        page.draw_line((xs[0], y0 + r * rh), (xs[-1], y0 + r * rh))
+    for x in xs:
+        page.draw_line((x, y0), (x, y0 + 3 * rh))
+    texts = [b["text"] for p in extract.extract("t.pdf", pdf.tobytes())["pages"] for b in p]
+    assert texts == ["Exam schedule.", WANT]
+
+
+def test_deleting_a_chat_removes_bookmarks_of_its_answers(client, people):
+    v = people["Viewer"]
+    assert put(client, v, "chats", {"id": "chB", "title": "x", "msgs": []}).status_code == 200
+    assert put(client, v, "bm_answers", {"id": "baB", "chat": "chB", "msg": "m1", "q": "q"}).status_code == 200
+    assert client.delete("/records/chats/chB", headers=v).status_code == 200
+    assert not any(b["id"] == "baB" for b in client.get("/records", headers=v).json()["bm_answers"])
