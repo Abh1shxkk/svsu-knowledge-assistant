@@ -85,7 +85,8 @@ export function TickGauge({ percent, label }: { percent: number; label: string }
             stroke={on ? "var(--chart)" : "var(--line-2)"} strokeWidth={long ? 3 : 2} strokeLinecap="round" />;
         })}
         <rect x={cx - 34} y={cy - 46} width="68" height="40" rx="20" fill="var(--chart)" />
-        <text x={cx} y={cy - 20} textAnchor="middle" fill="var(--accent-ink)" fontSize="17" fontWeight="600">{percent}%</text>
+        {/* inline style: the general `.chart text` rule (small, grey axis labels) would otherwise win */}
+        <text x={cx} y={cy - 20} textAnchor="middle" style={{ fill: "var(--accent-ink)", fontSize: 17, fontWeight: 600 }}>{percent}%</text>
       </svg>
       <span className="xs muted" style={{ marginTop: 2 }}>{label}</span>
     </div>
