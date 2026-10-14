@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from . import rag, store
 from .config import settings
 from .database import engine
-from .llm import chat, embed
+from .llm import chat
 from .policy import ANSWERABLE
 
 STYLES = ["a clear question in English",
@@ -68,17 +68,6 @@ def make_set(n: int) -> list[dict]:
     return items
 
 
-def _flat(body: list[dict]) -> str:
-    """The whole answer as text for the judge: paragraphs, lists and tables alike."""
-    out = []
-    for part in body:
-        out += [part[k] for k in ("p", "sub") if part.get(k)]
-        out += part.get("ul") or []
-        if t := part.get("table"):
-            out += [" | ".join(t.get("head") or [])] + [" | ".join(r) for r in t.get("rows") or []]
-    return "\n".join(map(str, out))
-
-
 def run(n: int = 50, new: bool = False) -> dict:
     saved = store.get("eval", "set")
     items = make_set(n) if new or not saved or not saved.get("items") else saved["items"][:n]
@@ -88,11 +77,10 @@ def run(n: int = 50, new: bool = False) -> dict:
     for it in items:
         if it["doc_id"] not in docs:  # the document was withdrawn or deleted since the set was made
             continue
-        queries = rag.rewrite(it["question"], [])
-        hits = rag._search_all(embed(queries), list(docs), top_k, rag.search_terms(queries, list(docs)))
+        _, _, _, hits = rag.retrieve(it["question"], [], docs, list(docs), list(docs), top_k)
         found = any((h["doc_id"], h["page"], h["block"]) == (it["doc_id"], it["page"], it["block"]) for h in hits)
-        answer = rag._generate(it["question"], hits, docs, "auto") if hits else dict(rag._INSUFFICIENT)
-        said = _flat(answer["body"])
+        answer = rag.last(rag._generate(it["question"], hits, docs, "auto", check=False)) if hits else dict(rag._INSUFFICIENT)
+        said = rag.flat_text(answer["body"])
         verdict = chat(_JUDGE, f"Question: {it['question']}\nExpected answer: {it['answer']}\nAssistant's answer: {said}",
                        as_json=True, model=settings.fast_model, temperature=0)
         results.append({**it, "found": found, "doc_found": any(h["doc_id"] == it["doc_id"] for h in hits),

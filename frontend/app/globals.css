@@ -347,6 +347,7 @@ mark.hl.pulse{animation:pulse 1.6s ease-out 1}
 .banner.historical,.banner.scope{background:var(--amber-soft);color:var(--amber)}
 .banner.insuff{background:var(--surface-2);color:var(--fg-2);border:1px dashed var(--line-2)}
 .banner span{color:var(--fg)}
+.draft{white-space:pre-wrap;line-height:1.65}
 .thinking{display:flex;flex-direction:column;gap:6px;padding:14px 16px;font-size:13px;color:var(--fg-3)}
 .thinking div{display:flex;gap:8px;align-items:center}
 .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line-2);border-top-color:var(--brand);animation:spin .8s linear infinite;flex:none}

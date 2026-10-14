@@ -65,24 +65,32 @@ function Ask() {
 
     const st = useStore.getState();
     const lang = st.ansLang;  // "auto": answer in the question's own language, Hinglish included
+    let draft = "";
     try {
-      const answer = await api.ask({
+      const answer = await api.askStream({
         question: q,
         scope_ids: scopeDocs(st).map((d) => d.id),
         lang,
         // Earlier questions in this chat, so a follow-up like "and in 2023?" can be rewritten in full.
         history: chat.msgs.filter((m): m is Extract<Msg, { role: "user" }> => m.role === "user").map((m) => m.text).slice(0, -1),
-      });
+      }, (e) => show(chat.id, aiMsg.id, e.delta ? { draft: (draft += e.delta) } : { status: e.status }));
       finish(chat.id, aiMsg.id, { answer });  // unanswered questions are logged by the server
     } catch (e) {
       finish(chat.id, aiMsg.id, { error: (e as Error).message });
     }
   }
 
+  /** Progress while the answer is made: shown on screen only, saved once the answer is complete. */
+  function show(chatId: string, msgId: string, patch: { status?: string; draft?: string }) {
+    set({ chats: useStore.getState().chats.map((c) => c.id !== chatId ? c
+      : { ...c, msgs: c.msgs.map((m) => (m.id === msgId ? { ...m, ...patch } : m)) }) });
+  }
+
   function finish(chatId: string, msgId: string, patch: { answer?: Answer; error?: string }) {
     const chat = useStore.getState().chats.find((c) => c.id === chatId);
     if (!chat) return;
-    void save("chats", { ...chat, msgs: chat.msgs.map((m) => (m.id === msgId ? { ...m, pending: false, ...patch } : m)) });
+    void save("chats", { ...chat, msgs: chat.msgs.map((m) => (m.id === msgId
+      ? { ...m, pending: false, status: undefined, draft: undefined, ...patch } : m)) });
   }
 
   function onCite(msg: Extract<Msg, { role: "ai" }>, i: number) {
@@ -199,7 +207,8 @@ function Message({ m, onCite, onAsk, toast, save, chat }: {
   if (m.role === "user") return <div className="mu" lang={isHindi(m.text) ? "hi" : "en"}>{m.text}</div>;
   if (m.pending) return (
     <div className="ma"><div className="bot"><Icon n="spark" /></div><div className="box">
-      <div className="thinking"><div><span className="spin" />Searching the records…</div></div></div></div>
+      {m.draft && <div className="mb draft">{m.draft.replace(/\s*\[\d+(?:\s*,\s*\d+)*\]/g, "").replace(/\*\*/g, "")}</div>}
+      <div className="thinking"><div><span className="spin" />{m.status ?? "Searching the records…"}</div></div></div></div>
   );
   if (m.error) return (
     <div className="ma"><div className="bot"><Icon n="spark" /></div><div className="box">
@@ -221,6 +230,10 @@ function Message({ m, onCite, onAsk, toast, save, chat }: {
         <div className="searched"><Icon n="search" s /><span>Searched for: {a.queries.join(" · ")}</span></div>
       )}
       <AnswerView answer={a} msgId={m.id} lang={lang} onCite={(i) => onCite(ai, i)} onAsk={onAsk} />
+      {a.checks && a.checks.length > 0 && (
+        <div className="mb"><div className="banner historical factcheck"><Icon n="alert" s />
+          <span><b>Check before relying on this.</b> A second reading couldn&apos;t find these in the cited records: {a.checks.join(" · ")}</span></div></div>
+      )}
       {a.label === "Conflicting instructions" && cited.length >= 2 && (
         <div className="mb row">
           <button className="btn sm" type="button" onClick={() => openModal({ title: "Compare documents", wide: true, body: <CompareModal a={cited[0]} b={cited[1]} topic={m.q} /> })}>Compare both documents</button>

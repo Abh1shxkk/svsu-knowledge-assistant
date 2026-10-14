@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, String, Table, Text, case, func, literal
 
 from .config import settings
 from .database import engine, meta
-from .llm import chat, embed
+from .llm import chat, chat_stream, embed
 from .policy import ANSWERABLE
 
 blocks = Table(
@@ -31,24 +31,24 @@ LABELS = ["One source", "Multiple sources", "Revised policy", "Historical record
 LANGS = {"en": "English", "hi": "Hindi (Devanagari script)",
          "auto": "the same language and script as the question (Hindi typed in English letters, "
                  "i.e. Hinglish, gets a simple Hinglish answer in English letters)"}
-BODY_FORMAT = (
-    '"body" is a list of blocks: {"p": "paragraph"}, {"ul": ["item", ...]}, '
-    '{"table": {"head": ["column", ...], "rows": [["cell", ...], ...]}}, {"sub": "small note"}, '
-    '{"opts": ["specific question", ...]}. Use **bold** for key dates and numbers.'
-)
+_META = "---META---"
 _SYSTEM = (
     "You answer questions about Swami Vivekanand Subharti University (SVSU) records using ONLY the "
-    "numbered excerpts. Reply as JSON with keys label, banner, body, cites, follow.\n"
+    "numbered excerpts.\n"
+    "First write the answer in Markdown: short paragraphs, '- ' bullet lists, and '|' tables for schedules "
+    "or lists of people. Use **bold** for key dates and numbers. No headings and no horizontal rules. "
+    "After every claim put the number of the excerpt that supports it in square brackets, like [2].\n"
+    f"Then write a line with only {_META} and after it a JSON object with keys label, banner, cites, follow, options:\n"
     f"label: one of {LABELS}.\n"
     'banner: null, or {"kind": "revised"|"historical"|"conflict"|"insuff", "text": "one sentence"}.\n'
-    f"{BODY_FORMAT} Mark every claim with {{n}}, where n is the number of the excerpt that supports it.\n"
     'cites: one per excerpt you used, [{"excerpt": n, "quote": "the exact words copied from excerpt n '
     'that support your claim, at most 20 words"}].\n'
     "follow: up to 3 short follow-up questions the records could answer.\n"
+    "options: an empty list, except for Needs clarification: 3 to 5 specific questions.\n"
     "Rules: Prefer Active documents. {history_rule} If two Active documents disagree, label Conflicting instructions with a conflict banner and "
     "present both. If the excerpts do not answer the question, label Insufficient evidence with an insuff "
     "banner and say what the closest document does cover. If the question is too vague, label Needs "
-    "clarification and offer 3 to 5 specific questions in an opts block. Never use outside knowledge. "
+    "clarification and give the specific questions as options. Never use outside knowledge. "
     "Never add up, count or otherwise calculate numbers yourself: give only figures written in the excerpts "
     "(for example a Total row), and if the figure asked for isn't written, say so. "
     "Never say 'excerpts'; call them documents or records. Write the answer in {lang}."
@@ -207,27 +207,77 @@ _HISTORY_RULES = {
 }
 
 
-def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: dict, lang: str,
-           history: list[str] = (), ai: dict | None = None) -> dict:
+_CANDIDATES = 30
+_RERANK = ("You judge search results for a question about university documents. Score how useful each numbered "
+           "passage is for answering the question: 10 = it states the answer, 5 = related background, 0 = unrelated. "
+           "Mind which event, course or year the question is about. "
+           'Reply as JSON {"scores": [one number per passage, in order]}.')
+
+
+def rerank(question: str, hits: list[dict], keep: int, docs: dict) -> list[dict]:
+    """A small model reads the candidates against the question and keeps the most useful. Search alone
+    mixes up look-alikes (every event notice has a committee table); reading tells them apart."""
+    if len(hits) <= keep:
+        return hits
+    listing = "\n\n".join(f"[{n}] ({docs[h['doc_id']]['title']}) {h['text'][:500]}" for n, h in enumerate(hits, 1))
+    try:
+        scores = [float(s) for s in chat(_RERANK, f"Question: {question}\n\nPassages:\n{listing}",
+                                         as_json=True, model=settings.fast_model, temperature=0)["scores"]]
+    except Exception:  # noqa: BLE001 — ranking improves answers, it's never a reason to fail one
+        return hits[:keep]
+    if len(scores) != len(hits):
+        return hits[:keep]
+    order = sorted(range(len(hits)), key=lambda i: -scores[i])  # stable: ties keep the search order
+    return [hits[i] for i in order[:keep]]
+
+
+def retrieve(question: str, history: list[str], docs: dict, ids: list[str], term_ids: list[str], keep: int):
+    """1. the LLM rewrites the question into search queries, 2. meaning-based plus exact search finds
+    ~30 candidate paragraphs, 3. a small model keeps the `keep` most useful. Returns queries, vectors,
+    exact terms and the paragraphs."""
+    queries = rewrite(question, history)
+    vectors = embed(queries)
+    terms = search_terms(queries, term_ids)
+    return queries, vectors, terms, rerank(question, _search_all(vectors, ids, max(keep, _CANDIDATES), terms), keep, docs)
+
+
+def last(events) -> dict:
+    """The final answer of an answer stream, for callers that don't show progress."""
+    for e in events:
+        pass
+    return e["done"]
+
+
+def answer(*args, **kw) -> dict:
+    return last(answer_events(*args, **kw))
+
+
+def answer_events(question: str, scope_ids: list[str], permitted_ids: list[str], docs: dict, lang: str,
+                  history: list[str] = (), ai: dict | None = None):
     """docs: id -> document record. Answers only from answerable documents inside the scope.
 
-    1. the LLM rewrites the question into search queries, 2. semantic search finds the paragraphs,
-    3. the LLM writes the answer from those paragraphs only, citing each one.
+    Yields {"status": ...} as it works, {"delta": text} while the answer is written, then {"done": answer}.
     """
     usable = lambda ids: [i for i in ids if i in docs and docs[i]["status"] in ANSWERABLE]  # noqa: E731
-    queries = rewrite(question, list(history))
-    vectors = embed(queries)
     ai = ai or {}
-    terms = search_terms(queries, usable(permitted_ids))
-    hits = _search_all(vectors, usable(scope_ids), int(ai.get("maxSources") or settings.top_k), terms)
-    result = _generate(question, hits, docs, lang, ai.get("histOnly", True) is not False) if hits else dict(_INSUFFICIENT)
+    yield {"status": "Searching the records…"}
+    queries, vectors, terms, hits = retrieve(question, list(history), docs, usable(scope_ids), usable(permitted_ids),
+                                             int(ai.get("maxSources") or settings.top_k))
+    result = dict(_INSUFFICIENT)
+    if hits:
+        yield {"status": f"Reading {len(hits)} passages…"}
+        for e in _generate(question, hits, docs, lang, ai.get("histOnly", True) is not False):
+            if "done" in e:
+                result = e["done"]
+            else:
+                yield e
     result["queries"] = queries[1:] or queries
     if result["label"] == "Insufficient evidence" and set(scope_ids) != set(permitted_ids):
         # Nothing in scope, but maybe in documents the person narrowed away: say which.
         outside = {h["doc_id"] for h in _search_all(vectors, usable(permitted_ids), 5, terms)
                    if h["score"] >= 0.4} - set(scope_ids)
         if outside:
-            return {
+            result = {
                 "source": "documents", "label": "Outside your scope", "cites": [], "follow": [],
                 "queries": result["queries"], "missing": sorted(outside),
                 "banner": {"kind": "scope", "text": "The documents needed for this answer are outside "
@@ -236,7 +286,7 @@ def answer(question: str, scope_ids: list[str], permitted_ids: list[str], docs: 
                                "These permitted documents look relevant:"},
                          {"ul": [f"**{docs[i]['title']}** ({docs[i]['ref']})" for i in sorted(outside)]}],
             }
-    return result
+    yield {"done": result}
 
 
 def _neighbours(hits: list[dict]) -> dict[int, str]:
@@ -266,32 +316,70 @@ def _text(x) -> str:
     return "" if x is None else str(x)
 
 
-def _clean_body(body) -> list[dict]:
-    """Keep only the block shapes the screens draw, with every piece of text a string."""
-    out: list[dict] = []
-    for part in body if isinstance(body, list) else []:
-        if isinstance(part, str):
-            part = {"p": part}
-        if not isinstance(part, dict):
-            continue
-        for key in ("p", "sub"):
-            if key in part:
-                out.append({key: _text(part[key])})
-        for key in ("ul", "opts"):
-            if isinstance(part.get(key), list):
-                out.append({key: [t for t in map(_text, part[key]) if t]})
-        if isinstance(part.get("table"), dict):
-            t = part["table"]
-            out.append({"table": {"head": [_text(h) for h in t.get("head") or []],
-                                  "rows": [[_text(c) for c in r] for r in t.get("rows") or [] if isinstance(r, list)]}})
-    return out
+def _md_body(md: str) -> list[dict]:
+    """The model's Markdown as the blocks the screens draw: paragraphs, bullet lists and tables.
+    Citation marks [2] or [1, 3] become {2} or {1}{3}."""
+    md = re.sub(r"\[(\d+(?:\s*,\s*\d+)*)\]", lambda m: "".join(f"{{{n}}}" for n in re.findall(r"\d+", m[1])), md)
+    body, in_para = [], False
+    for line in (ln.strip() for ln in md.splitlines()):
+        prev = body[-1] if body else {}
+        item = re.match(r"(?:[-*•]|\d+[.)])\s+(.*)", line)
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if not all(re.fullmatch(r":?-{2,}:?", c) for c in cells):  # skip the |---|---| line
+                if "table" in prev:
+                    prev["table"]["rows"].append(cells)
+                else:
+                    body.append({"table": {"head": cells, "rows": []}})
+        elif item:
+            if "ul" in prev:
+                prev["ul"].append(item[1])
+            else:
+                body.append({"ul": [item[1]]})
+        elif line:
+            line = re.sub(r"^#+\s*(.*)", r"**\1**", line)
+            if in_para:
+                prev["p"] += " " + line
+            else:
+                body.append({"p": line})
+        in_para = bool(line) and not line.startswith("|") and not item
+    return body
+
+
+def flat_text(body: list[dict]) -> str:
+    """An answer as plain text: paragraphs, lists and tables alike."""
+    out = []
+    for part in body:
+        out += [part[k] for k in ("p", "sub") if part.get(k)]
+        out += part.get("ul") or []
+        if t := part.get("table"):
+            out += [" | ".join(t.get("head") or [])] + [" | ".join(r) for r in t.get("rows") or []]
+    return "\n".join(map(str, out))
+
+
+_CHECK = ("You check an answer against the records it was written from. List each statement in the answer that "
+          "the records do not support: a date, number, name, place or rule that is missing from them or different. "
+          "Ignore wording, language (Hindi, English or Hinglish), formatting and polite phrases. Reply as JSON "
+          '{"unsupported": ["the statement, briefly", ...]}, with an empty list when everything is supported.')
+
+
+def fact_check(answer_text: str, records: str) -> list[str]:
+    """Statements a second, independent reading can't find in the records (shown as a warning)."""
+    try:
+        res = chat(_CHECK, f"Records:\n{records}\n\nAnswer:\n{answer_text}", as_json=True,
+                   model=settings.fast_model, temperature=0)
+    except Exception:  # noqa: BLE001 — a failed check must not hide the answer
+        return []
+    return [t for t in map(_text, res.get("unsupported") or []) if t][:5]
 
 
 def _clean_banner(b) -> dict | None:
     return {"kind": _text(b.get("kind")), "text": _text(b.get("text"))} if isinstance(b, dict) and b.get("text") else None
 
 
-def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True) -> dict:
+def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True, check: bool = True):
+    """Yields {"delta": text} while the model writes, {"status": ...} while the answer is checked, then
+    {"done": answer}."""
     around = _neighbours(hits)
 
     def excerpt(n, p):
@@ -299,37 +387,55 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
         dates = f"effective {d.get('effective') or '?'}" + (f" to {d['expiry']}" if d.get("expiry") else "")
         return f"[{n}] \"{d['title']}\" ({d['ref']}; {d['status']}; {dates}; page {p['page']})\n{around.get(p.get('id'), p['text'])}"
 
+    records = "\n\n".join(excerpt(n, h) for n, h in enumerate(hits, 1))
     system = _SYSTEM.replace("{lang}", LANGS.get(lang, LANGS["auto"])).replace("{history_rule}", _HISTORY_RULES[hist_only])
-    res = chat(system,
-               "Excerpts:\n" + "\n\n".join(excerpt(n, h) for n, h in enumerate(hits, 1))
-               + f"\n\nToday's date: {_today()} (anything dated earlier has already happened)."
-               + f"\nQuestion: {question}", as_json=True)
+    full, sent = "", 0
+    for piece in chat_stream(system, "Excerpts:\n" + records
+                             + f"\n\nToday's date: {_today()} (anything dated earlier has already happened)."
+                             + f"\nQuestion: {question}"):
+        full += piece
+        cut = full.find(_META)  # the details after the marker are for the server, not the reader
+        shown = full[:cut] if cut >= 0 else full[:len(full) - len(_META)]
+        if len(shown) > sent:
+            yield {"delta": shown[sent:]}
+            sent = len(shown)
+    text, _, meta = full.partition(_META)
+    try:
+        res = json.loads(meta[meta.find("{"):meta.rfind("}") + 1])
+    except ValueError:
+        res = None
+    res = res if isinstance(res, dict) else {}
     # The model's own list of the excerpts it used (numbers may arrive as text).
     listed = {int(c["excerpt"]): c.get("quote") for c in res.get("cites") or []
               if isinstance(c, dict) and str(c.get("excerpt", "")).strip().isdigit() and 1 <= int(c["excerpt"]) <= len(hits)}
-    body = _clean_body(res.get("body"))
+    body = _md_body(text)
+    if options := [t for t in map(_text, res.get("options") or []) if t]:
+        body.append({"opts": options[:5]})
     if listed and not re.search(r"\{\d+\}", json.dumps(body)):
-        # It listed sources but left out the {n} markers: cite them at the end of the answer, never drop them.
+        # It listed sources but left out the markers: cite them at the end of the answer, never drop them.
         marks = " " + "".join(f"{{{n}}}" for n in listed)
-        last = next((p for p in reversed(body) if isinstance(p, dict) and isinstance(p.get("p"), str)), None)
-        if last:
-            last["p"] += marks
+        last_p = next((p for p in reversed(body) if isinstance(p.get("p"), str)), None)
+        if last_p:
+            last_p["p"] += marks
         else:
             body.append({"sub": "Sources:" + marks})
     # Renumber excerpt references {n} as 1, 2, 3… in the order they first appear in the answer.
-    quotes = listed
-    text = json.dumps(body, ensure_ascii=False)
-    order = list(dict.fromkeys(int(n) for n in re.findall(r"\{(\d+)\}", text) if 1 <= int(n) <= len(hits)))
-    text = re.sub(r"\{(\d+)\}", lambda m: f"{{{order.index(int(m[1])) + 1}}}" if int(m[1]) in order else "", text)
+    blob = json.dumps(body, ensure_ascii=False)
+    order = list(dict.fromkeys(int(n) for n in re.findall(r"\{(\d+)\}", blob) if 1 <= int(n) <= len(hits)))
+    blob = re.sub(r"\{(\d+)\}", lambda m: f"{{{order.index(int(m[1])) + 1}}}" if int(m[1]) in order else "", blob)
     cites = []
     for n in order:
         p = hits[n - 1]
-        quote = quotes.get(n) or ""
+        quote = listed.get(n) or ""
         cites.append({"doc": p["doc_id"], "page": p["page"], "block": p["block"],
                       "quote": quote if quote and quote in p["text"] else p["text"][:160]})  # quotes from the context fall back
-    return {"source": "documents", "label": res.get("label") if res.get("label") in LABELS else "One source",
-            "banner": _clean_banner(res.get("banner")), "body": json.loads(text), "cites": cites,
-            "follow": [t for t in map(_text, res.get("follow") or []) if t][:3]}
+    label = res.get("label") if res.get("label") in LABELS else "One source"
+    result = {"source": "documents", "label": label, "banner": _clean_banner(res.get("banner")), "body": json.loads(blob),
+              "cites": cites, "follow": [t for t in map(_text, res.get("follow") or []) if t][:3]}
+    if check and label not in ("Insufficient evidence", "Needs clarification"):
+        yield {"status": "Checking the answer against the records…"}
+        result["checks"] = fact_check(re.sub(r"\{\d+\}", "", flat_text(result["body"])), records)
+    yield {"done": result}
 
 
 _INSUFFICIENT = {

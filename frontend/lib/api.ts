@@ -15,7 +15,7 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
-async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -25,11 +25,19 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (typeof window !== "undefined" && location.pathname !== "/login") location.href = "/login";
   }
   if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.detail ?? `Request failed (${res.status})`);
+  return res;
+}
+
+async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await send(path, init);
   return (res.headers.get("content-type")?.includes("json") ? res.json() : res.blob()) as Promise<T>;
 }
 const jsonBody = (method: string, body: unknown): RequestInit => ({
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
+
+type AskBody = { question: string; scope_ids: string[]; lang: string; history: string[] };
+export type AskEvent = { status?: string; delta?: string };
 
 export type ImportBatch = {
   batch: string; by: string; publish: boolean; updated: string | null;
@@ -58,8 +66,26 @@ export const api = {
   records: () => call<Records>("/records"),
   put: (kind: Kind, id: string, data: unknown) => call(`/records/${kind}/${encodeURIComponent(id)}`, jsonBody("PUT", data)),
   remove: (kind: Kind, id: string) => call(`/records/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  ask: (body: { question: string; scope_ids: string[]; lang: string; history: string[] }) =>
-    call<Answer>("/ask", jsonBody("POST", body)),
+  ask: (body: AskBody) => call<Answer>("/ask", jsonBody("POST", body)),
+  /** The same answer, received while it is made: progress and the text as it is written, then the answer. */
+  askStream: async (body: AskBody, onEvent: (e: AskEvent) => void): Promise<Answer> => {
+    const reader = (await send("/ask/stream", jsonBody("POST", body))).body!.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error("The answer was cut off. Please try again.");
+      buf += value;
+      for (let i = buf.indexOf("\n\n"); i >= 0; i = buf.indexOf("\n\n")) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (!line.startsWith("data: ")) continue;
+        const e = JSON.parse(line.slice(6));
+        if (e.done) return e.done as Answer;
+        if (e.error) throw new Error(e.error);
+        onEvent(e);
+      }
+    }
+  },
   extract: (file: File) => {
     const fd = new FormData();
     fd.append("file", file);

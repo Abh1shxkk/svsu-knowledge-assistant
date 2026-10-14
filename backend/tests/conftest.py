@@ -35,18 +35,24 @@ def fake_chat(system, user, as_json=False, model=None, temperature=None):
         return {"correct": "Twelve days" in user}
     if "search queries" in system:
         return {"queries": []}
-    if "Excerpts:" in user:
-        return {"label": "One source", "banner": None, "body": [{"p": "Twelve days {1}."}],
-                "cites": [{"excerpt": 1, "quote": ""}], "follow": []}
     if "deadline" in system:
         return {"deadlines": []}
-    return {}  # suggested details
+    return {}  # suggested details (and no re-ranking or fact-check findings)
+
+
+ANSWER = 'Twelve days [1].\n---META---\n{"label": "One source", "banner": null, "cites": [{"excerpt": 1, "quote": ""}], "follow": []}'
+
+
+def fake_stream(system, user, model=None, temperature=None):
+    for i in range(0, len(ANSWER), 7):  # in small pieces, as the real model streams
+        yield ANSWER[i:i + 7]
 
 
 @pytest.fixture(scope="session")
 def client():
-    rag.embed = evaluate.embed = fake_embed
+    rag.embed = fake_embed
     rag.chat = extract.chat = evaluate.chat = fake_chat
+    rag.chat_stream = fake_stream
     with engine.begin() as c:
         c.execute(text("TRUNCATE records, credentials, blocks, secrets, files, jobs"))
     with TestClient(main.app) as c:

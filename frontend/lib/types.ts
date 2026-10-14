@@ -34,10 +34,12 @@ export type BodyPart = { p?: string; ul?: string[]; table?: { head: string[]; ro
 export type Answer = {
   source: "documents"; label: string; banner: { kind: string; text: string } | null;
   body: BodyPart[]; cites: Cite[]; follow: string[]; missing?: string[]; queries?: string[];
+  /** Statements the fact check could not find in the cited records. */
+  checks?: string[];
 };
 export type Msg =
   | { id: string; role: "user"; text: string }
-  | { id: string; role: "ai"; q: string; pending?: boolean; error?: string; answer?: Answer; fb?: "up" | "down" };
+  | { id: string; role: "ai"; q: string; pending?: boolean; status?: string; draft?: string; error?: string; answer?: Answer; fb?: "up" | "down" };
 /** at: when the chat started (ISO); `when` is the label older chats were saved with. */
 export type Chat = { id: string; title: string; msgs: Msg[]; saved: boolean; savedName?: string; when?: string; at?: string };
 

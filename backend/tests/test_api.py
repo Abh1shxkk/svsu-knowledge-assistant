@@ -1,5 +1,6 @@
 """The API end to end, per role, against the test database."""
 import io
+import json
 
 from conftest import login
 
@@ -202,16 +203,70 @@ def test_deadlines_and_reminders_need_access_to_the_document(client, people):
     assert put(client, v, "reminders", {"id": "rmMO", "deadline": "dlMO", "days": 1, "via": ["Email"]}).status_code == 404
 
 
-def test_answer_keeps_citations_when_the_model_forgets_the_markers(monkeypatch):
+def _model_writes(monkeypatch, text):
     from app import rag
+    monkeypatch.setattr(rag, "chat_stream", lambda *a, **k: iter([text[:9], text[9:]]))
     hits = [{"doc_id": "D1", "page": 1, "block": "b1", "text": "Invigilators must report 48 minutes before the session."}]
     docs = {"D1": {"title": "T", "ref": "R", "status": "Active", "effective": "", "expiry": ""}}
-    monkeypatch.setattr(rag, "chat", lambda *a, **k: {
-        "label": "One source", "body": [{"p": "They report **48 minutes** before."}],
-        "cites": [{"excerpt": "1", "quote": "48 minutes before the session"}], "follow": []})
-    res = rag._generate("q", hits, docs, "en")
+    return list(rag._generate("q", hits, docs, "en", check=False))
+
+
+def test_answer_keeps_citations_when_the_model_forgets_the_markers(monkeypatch):
+    events = _model_writes(monkeypatch, 'They report **48 minutes** before.\n---META---\n'
+                                        '{"label": "One source", "cites": [{"excerpt": "1", "quote": "48 minutes before the session"}]}')
+    res = events[-1]["done"]
     assert res["body"][0]["p"].endswith("{1}")
     assert res["cites"] == [{"doc": "D1", "page": 1, "block": "b1", "quote": "48 minutes before the session"}]
+    assert "".join(e.get("delta", "") for e in events).strip() == "They report **48 minutes** before."  # no META shown
+
+
+def test_markdown_answers_become_paragraphs_lists_and_tables(monkeypatch):
+    md = ("Invigilators report early [1].\nThey sign in at the desk.\n\n- Bring ID [1]\n- Be on time\n\n"
+          "| Date | Time |\n|---|---|\n| 14/10/2026 | 09:00 [1, 1] |\n---META---\n"
+          '{"label": "Revised policy", "banner": {"kind": "revised", "text": {"text": "Changed."}}, '
+          '"follow": [{"question": "When do exams end?"}, null, "Where?"]}')
+    res = _model_writes(monkeypatch, md)[-1]["done"]
+    assert res["body"] == [{"p": "Invigilators report early {1}. They sign in at the desk."}, {"ul": ["Bring ID {1}", "Be on time"]},
+                           {"table": {"head": ["Date", "Time"], "rows": [["14/10/2026", "09:00 {1}{1}"]]}}]
+    assert res["label"] == "Revised policy" and res["banner"] == {"kind": "revised", "text": "Changed."}
+    assert res["follow"] == ["When do exams end?", "Where?"]
+
+
+def test_answer_without_details_still_shows_text_and_sources(monkeypatch):
+    res = _model_writes(monkeypatch, "They report 48 minutes early [1].")[-1]["done"]
+    assert res["label"] == "One source" and res["cites"][0]["doc"] == "D1"
+
+
+def test_reranking_keeps_the_passages_that_answer(monkeypatch):
+    from app import rag
+    hits = [{"doc_id": "D1", "text": f"passage {i}"} for i in range(5)]
+    docs = {"D1": {"title": "T"}}
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: {"scores": [1, 9, 0, 9, 3]})
+    assert [h["text"] for h in rag.rerank("q", hits, 3, docs)] == ["passage 1", "passage 3", "passage 4"]
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: {"scores": [1, 2]})        # a muddled reply: search order
+    assert [h["text"] for h in rag.rerank("q", hits, 2, docs)] == ["passage 0", "passage 1"]
+
+
+def test_fact_check_flags_unsupported_statements(monkeypatch):
+    from app import rag
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: {"unsupported": ["Total is 2056", {"s": "Held online"}]})
+    assert rag.fact_check("answer", "records") == ["Total is 2056", "Held online"]
+    monkeypatch.setattr(rag, "chat", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    assert rag.fact_check("answer", "records") == []                          # a failed check never blocks the answer
+
+
+def test_answers_stream_progress_text_and_the_final_answer(client, people):
+    ap, v = people["Approver"], people["Viewer"]
+    page = [[{"id": "b1", "text": "Staff may take twelve days of casual leave.", "kind": "p"}]]
+    assert put(client, ap, "documents", doc("ST1", status="Active", pages=page)).status_code == 200
+    r = client.post("/ask/stream", headers=v, json={"question": "Casual leave?", "scope_ids": ["ST1"]})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+    events = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    assert events[0] == {"status": "Searching the records…"}
+    assert "".join(e.get("delta", "") for e in events).startswith("Twelve days")
+    done = events[-1]["done"]
+    assert done["cites"][0]["doc"] == "ST1" and done["checks"] == []
+    assert done["body"] == client.post("/ask", headers=v, json={"question": "Casual leave?", "scope_ids": ["ST1"]}).json()["body"]
 
 
 ROWS = [["Date", "Subject", "Time"], ["14/10/2026", "Library Cataloguing", "09:00 AM"], ["15/10/2026", "Library Classification", "02:00 PM"]]
@@ -293,21 +348,6 @@ def test_pdf_pages_are_served_as_pictures_to_permitted_people(client, people):
     assert client.get("/documents/PG1/file/page/1", headers=v).status_code == 404   # not published
 
 
-def test_answer_text_is_always_plain_strings(monkeypatch):
-    """The model sometimes returns objects where text belongs; that used to crash the Ask page."""
-    from app import rag
-    hits = [{"doc_id": "D1", "page": 1, "block": "b1", "text": "Exams start on 12 October."}]
-    docs = {"D1": {"title": "T", "ref": "R", "status": "Active", "effective": "", "expiry": ""}}
-    monkeypatch.setattr(rag, "chat", lambda *a, **k: {
-        "label": "One source", "banner": {"kind": "revised", "text": {"text": "Changed."}},
-        "body": ["Plain {1}", {"ul": [{"item": "First"}, "Second"]}, {"table": {"head": ["A", 1], "rows": [[{"v": "x"}, 2]]}}],
-        "cites": [{"excerpt": 1}], "follow": [{"question": "When do exams end?"}, None, "Where?"]})
-    res = rag._generate("q", hits, docs, "en")
-    assert res["follow"] == ["When do exams end?", "Where?"]
-    assert res["body"] == [{"p": "Plain {1}"}, {"ul": ["First", "Second"]}, {"table": {"head": ["A", "1"], "rows": [["x", "2"]]}}]
-    assert res["banner"] == {"kind": "revised", "text": "Changed."}
-
-
 def test_tiny_fragments_join_the_next_paragraph():
     from app import extract
     text = "NOTICE\n\nARTI\n\nThe first sessional test will be held as per the following schedule.\n\nHead"
@@ -370,7 +410,7 @@ def test_quality_report_from_generated_questions(client, people, admin):
 
 
 def test_quality_judge_reads_tables_and_lists():
-    from app.evaluate import _flat
+    from app.rag import flat_text as _flat
     body = [{"p": "Schedule:"}, {"ul": ["Item one"]}, {"table": {"head": ["Date", "Subject"], "rows": [["14/10/2026", "Cataloguing"]]}}]
     assert _flat(body).split(chr(10)) == ["Schedule:", "Item one", "Date | Subject", "14/10/2026 | Cataloguing"]
 

@@ -48,6 +48,15 @@ def chat(system: str, user: str, as_json: bool = False, model: str | None = None
     return json.loads(text) if as_json else text
 
 
+def chat_stream(system: str, user: str, model: str | None = None, temperature: float = 0.2):
+    """Like chat(), but yields the reply's text piece by piece as the model writes it."""
+    for part in client().chat.completions.create(
+            model=model or settings.chat_model, temperature=temperature, stream=True,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}]):
+        if part.choices and part.choices[0].delta.content:
+            yield part.choices[0].delta.content
+
+
 def embed(texts: list[str], batch: int = 256) -> list[list[float]]:
     """Sent in batches, so a long document stays under the API's per-request limits."""
     out: list[list[float]] = []

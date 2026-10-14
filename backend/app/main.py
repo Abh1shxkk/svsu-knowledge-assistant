@@ -9,6 +9,7 @@ from pathlib import Path
 import pymupdf
 from fastapi import Body, Form, Depends, FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from . import auth, evaluate, export, extract, jobs, llm, notices, policy, rag, store
@@ -258,19 +259,39 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
     return {"ok": True}
 
 
-@app.post("/ask")
-def ask(body: Ask, user: dict = Depends(auth.current_user)):
+def _answer_events(body: Ask, user: dict):
     ctx, ai = _ctx(), _setting("ai")
     docs = {d["id"]: d for d in store.list_of("documents") if policy.can_answer(user, d, ctx)}
     scope = [i for i in body.scope_ids if i in docs]  # never more than this person may see
-    result = rag.answer(body.question, scope, list(docs), docs, body.lang, body.history, ai)
-    now = datetime.now()
-    store.put("questions", uuid.uuid4().hex, {  # usage figures for Reports; who asked is not kept
-        "at": now.isoformat(timespec="seconds"), "label": result["label"], "cited": bool(result.get("cites")),
-        "dept": user.get("dept", "")})
-    if result["label"] == "Insufficient evidence" and ai.get("logUnans", True):
-        _log_unanswered(body.question, user.get("dept") or "Unassigned", now)
-    return result
+    for e in rag.answer_events(body.question, scope, list(docs), docs, body.lang, body.history, ai):
+        if "done" in e:
+            result, now = e["done"], datetime.now()
+            store.put("questions", uuid.uuid4().hex, {  # usage figures for Reports; who asked is not kept
+                "at": now.isoformat(timespec="seconds"), "label": result["label"], "cited": bool(result.get("cites")),
+                "dept": user.get("dept", "")})
+            if result["label"] == "Insufficient evidence" and ai.get("logUnans", True):
+                _log_unanswered(body.question, user.get("dept") or "Unassigned", now)
+        yield e
+
+
+@app.post("/ask")
+def ask(body: Ask, user: dict = Depends(auth.current_user)):
+    return rag.last(_answer_events(body, user))
+
+
+@app.post("/ask/stream")
+def ask_stream(body: Ask, user: dict = Depends(auth.current_user)):
+    """The same answer as /ask, sent while it is made (server-sent events): progress, the text as the
+    model writes it, then the finished answer."""
+    def events():
+        try:
+            for e in _answer_events(body, user):
+                yield f"data: {json.dumps(e, ensure_ascii=False)}\n\n"
+        except Exception as e:  # noqa: BLE001 — the response has started, so the error goes in the stream
+            yield f"data: {json.dumps({'error': 'The answer could not be completed. Please try again.'})}\n\n"
+            raise e
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/extract")
