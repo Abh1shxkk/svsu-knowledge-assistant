@@ -359,7 +359,8 @@ def flat_text(body: list[dict]) -> str:
 
 _CHECK = ("You check an answer against the records it was written from. List each statement in the answer that "
           "the records do not support: a date, number, name, place or rule that is missing from them or different. "
-          "Ignore wording, language (Hindi, English or Hinglish), formatting and polite phrases. Reply as JSON "
+          "The records may come from different documents about different events: a statement is supported if any "
+          "record states it, even when another record says something else about a different event. Ignore wording, language (Hindi, English or Hinglish), formatting and polite phrases. Reply as JSON "
           '{"unsupported": ["the statement, briefly", ...]}, with an empty list when everything is supported.')
 
 
@@ -434,7 +435,8 @@ def _generate(question: str, hits, docs: dict, lang: str, hist_only: bool = True
               "cites": cites, "follow": [t for t in map(_text, res.get("follow") or []) if t][:3]}
     if check and label not in ("Insufficient evidence", "Needs clarification"):
         yield {"status": "Checking the answer against the records…"}
-        result["checks"] = fact_check(re.sub(r"\{\d+\}", "", flat_text(result["body"])), records)
+        cited = "\n\n".join(excerpt(n, hits[n - 1]) for n in order) or records  # only what the answer relies on
+        result["checks"] = fact_check(re.sub(r"\{\d+\}", "", flat_text(result["body"])), cited)
     yield {"done": result}
 
 

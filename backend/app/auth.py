@@ -73,6 +73,22 @@ def make_token(user: dict, role: str) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
+def make_ticket(login_id: str) -> str:
+    """Proof that the password was right, valid for 5 minutes, exchanged for a session with a code."""
+    payload = {"login_id": login_id, "ticket": True, "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
+
+def read_ticket(ticket: str) -> str:
+    try:
+        payload = jwt.decode(ticket, settings.jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        payload = {}
+    if not payload.get("ticket"):
+        raise HTTPException(401, "Sign-in took too long. Enter your password again.")
+    return payload["login_id"]
+
+
 def current_user(authorization: str = Header(default="")) -> dict:
     """The signed-in person, read fresh on every request: a role change, deactivation or deleted
     account takes effect immediately, not when their sign-in expires."""
@@ -80,6 +96,8 @@ def current_user(authorization: str = Header(default="")) -> dict:
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except jwt.PyJWTError:
+        raise HTTPException(401, "Please sign in again.")
+    if payload.get("ticket"):  # half-way through two-step sign-in: not a session
         raise HTTPException(401, "Please sign in again.")
     if payload.get("dev"):
         if payload.get("login_id") != settings.dev_admin_user:  # test admin was removed from .env

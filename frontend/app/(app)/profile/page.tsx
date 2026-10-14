@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { me, useStore } from "@/lib/store";
 import { Icon } from "@/components/icon";
 import { Field } from "@/components/ui";
+import { SetupMfa } from "@/components/mfa";
 
 const ROLE_HELP: Record<string, string> = {
   Administrator: "Everything, including users, roles, access levels and settings.",
@@ -45,6 +46,13 @@ export default function ProfilePage() {
         <div className="card">
           <div className="card-h"><h3>Password</h3></div>
           <div className="card-b"><PasswordForm /></div>
+        </div>
+      )}
+
+      {!isTestAdmin && (
+        <div className="card">
+          <div className="card-h"><h3>Two-step verification</h3></div>
+          <div className="card-b"><TwoStep /></div>
         </div>
       )}
 
@@ -117,6 +125,47 @@ function PasswordForm() {
       {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
       <div className="row" style={{ justifyContent: "flex-end" }}><button className="btn pri" type="submit" disabled={busy}>{busy ? "Saving…" : "Change password"}</button></div>
     </form>
+  );
+}
+
+/** A code from an authenticator app after the password, so a stolen password alone isn't enough. */
+function TwoStep() {
+  const { toast } = useStore.getState();
+  const [st, setSt] = useState<{ on: boolean; required: boolean; recovery_left: number } | null>(null);
+  const [mode, setMode] = useState<"" | "setup" | "off">("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const refresh = () => api.myMfa().then(setSt, () => setSt(null));
+  useEffect(() => { void refresh(); }, []);
+
+  if (!st) return <span className="spin" />;
+  if (mode === "setup") return <SetupMfa start={api.mfaSetup} confirm={async (c) => (await api.mfaEnable(c)).recovery}
+    onDone={() => { setMode(""); void refresh(); toast("Two-step verification is on"); }} />;
+  const turnOff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    try { await api.mfaDisable(password); setMode(""); setPassword(""); void refresh(); toast("Two-step verification is off"); }
+    catch (err) { setError((err as Error).message); }
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="row between">
+        <span className="sm">{st.on
+          ? <><span className="pill ok">On</span> Sign-in asks for a code from your phone. {st.recovery_left} recovery code{st.recovery_left === 1 ? "" : "s"} left.</>
+          : <><span className="pill">Off</span> Add a code from your phone to your password, so a stolen password alone can&apos;t open your account.</>}</span>
+        {!st.on ? <button className="btn pri" type="button" onClick={() => setMode("setup")}>Set up</button>
+          : !st.required && mode !== "off" && <button className="btn" type="button" onClick={() => setMode("off")}>Turn off</button>}
+      </div>
+      {st.on && st.required && <p className="xs muted">Required for your role, so it can&apos;t be turned off. Lost your phone? Use a recovery code, or ask an administrator to reset it.</p>}
+      {mode === "off" && (
+        <form className="row" style={{ gap: 8 }} onSubmit={turnOff}>
+          <input className="inp" type="password" placeholder="Your password" aria-label="Your password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ maxWidth: 240 }} />
+          <button className="btn danger" type="submit">Turn off</button>
+          <button className="btn ghost" type="button" onClick={() => setMode("")}>Cancel</button>
+        </form>
+      )}
+      {error && <div className="note bad"><Icon n="alert" s /><p className="sm">{error}</p></div>}
+    </div>
   );
 }
 

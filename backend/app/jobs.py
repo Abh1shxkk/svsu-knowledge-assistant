@@ -146,3 +146,21 @@ def _evaluate(d: dict) -> tuple[str, dict]:
 
 
 _HANDLERS = {"import": _import, "evaluate": _evaluate}
+
+
+# ---------- expiry ----------
+
+def expire_documents(today: date | None = None) -> list[str]:
+    """Active documents past their expiry date become Expired: still found for history questions,
+    never answered from as if current. Runs hourly; returns the titles it expired."""
+    today_s, done = (today or date.today()).isoformat(), []
+    for light in store.list_of("documents"):
+        if light.get("status") == "Active" and light.get("expiry") and light["expiry"] < today_s:
+            d = store.get("documents", light["id"])
+            d["status"] = "Expired"
+            d["approvals"] = [*d.get("approvals", []), {"step": "Expired automatically", "by": "System",
+                                                        "date": today_s, "kind": "warn", "note": f"Expiry date {d['expiry']}"}]
+            store.put("documents", d["id"], d)
+            store.audit("System", "Expired", d["title"])
+            done.append(d["title"])
+    return done

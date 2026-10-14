@@ -12,14 +12,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import auth, evaluate, export, extract, jobs, llm, notices, policy, rag, store
+from . import auth, evaluate, export, extract, jobs, llm, mfa, notices, policy, rag, store
 from .config import settings
 
 
-async def _reminder_loop():
-    while True:  # hourly; each reminder goes out at most once a day
+async def _hourly_loop():
+    while True:  # each reminder goes out at most once a day
         with suppress(Exception):
-            await asyncio.to_thread(notices.send_due_reminders)
+            await asyncio.to_thread(jobs.expire_documents)
+        if settings.smtp_host:
+            with suppress(Exception):
+                await asyncio.to_thread(notices.send_due_reminders)
         await asyncio.sleep(3600)
 
 
@@ -38,8 +41,7 @@ async def lifespan(_: FastAPI):
     if store.is_empty():
         _seed()
     jobs.requeue_stuck()
-    tasks = [asyncio.create_task(loop()) for loop, on in ((_reminder_loop, settings.smtp_host),
-                                                           (_worker_loop, settings.run_worker)) if on]
+    tasks = [asyncio.create_task(loop()) for loop in (_hourly_loop, _worker_loop)] if settings.run_worker else []
     yield
     for t in tasks:
         t.cancel()
@@ -70,15 +72,67 @@ def health():
     return {"ok": True}
 
 
+_LOCKED = "Too many wrong attempts. Wait 5 minutes and try again."
+
+
 @app.post("/login")
 def login(body: Login):
-    user = auth.verify(body.login_id, body.password)
+    """The password; then, for people with two-step verification (or whose role requires it), a ticket
+    for /login/mfa instead of a session."""
+    login_id = body.login_id.strip()
+    if mfa.locked(login_id):
+        raise HTTPException(429, _LOCKED)
+    user = auth.verify(login_id, body.password)
     if not user:
+        mfa.failed(login_id)
         raise HTTPException(401, "Wrong Login ID or password.")
-    user["role"] = auth.app_role(user["login_id"])
+    user["role"] = auth.app_role(login_id)
+    if not user.get("dev") and (mfa.is_on(login_id) or mfa.required(user["role"])):
+        return {"mfa": "code" if mfa.is_on(login_id) else "setup", "ticket": auth.make_ticket(login_id)}
+    mfa.succeeded(login_id)
+    return _session(user)
+
+
+def _session(user: dict) -> dict:
     if rec := auth.user_record(user["login_id"]):  # shown as "Last active" in Administration
         store.put("users", rec["id"], {**rec, "last": store.stamp(datetime.now())})
     return {"token": auth.make_token(user, user["role"]), "user": user}
+
+
+class Ticket(BaseModel):
+    ticket: str
+    code: str = ""
+
+
+@app.post("/login/mfa/setup")
+def login_mfa_setup(body: Ticket):
+    """Setting up two-step verification during sign-in, when the person's role requires it."""
+    login_id = auth.read_ticket(body.ticket)
+    if mfa.is_on(login_id):
+        raise HTTPException(400, "Two-step verification is already set up.")
+    return mfa.start(login_id)
+
+
+@app.post("/login/mfa")
+def login_mfa(body: Ticket):
+    """The code from the authenticator app (or a recovery code). During set-up, the first code switches
+    two-step verification on and the recovery codes come back once."""
+    login_id = auth.read_ticket(body.ticket)
+    if mfa.locked(login_id):
+        raise HTTPException(429, _LOCKED)
+    rec = auth.user_record(login_id)
+    if not rec or rec.get("active") is False:
+        raise HTTPException(401, "Your account is no longer active.")
+    on = mfa.is_on(login_id)
+    recovery = None if on else mfa.enable(login_id, body.code)
+    if not (mfa.check(login_id, body.code) if on else recovery):
+        mfa.failed(login_id)
+        raise HTTPException(401, "That code isn't right. Check that your phone's clock is correct and try again.")
+    mfa.succeeded(login_id)
+    user = {**auth._profile(login_id, rec), "role": auth.app_role(login_id)}
+    if recovery:
+        _audit(user, "Turned on two-step verification", login_id)
+    return {**_session(user), **({"recovery": recovery} if recovery else {})}
 
 
 @app.get("/me")
@@ -154,6 +208,58 @@ def change_own_password(body: PasswordChange, user: dict = Depends(auth.current_
     if err := auth.password_problem(body.new):
         raise HTTPException(400, err)
     store.set_credential(user["login_id"], auth.hash_password(body.new))
+    return {"ok": True}
+
+
+@app.get("/me/mfa")
+def my_mfa(user: dict = Depends(auth.current_user)):
+    return {**mfa.status(user["login_id"]), "required": mfa.required(user["role"])}
+
+
+@app.post("/me/mfa/setup")
+def my_mfa_setup(user: dict = Depends(auth.current_user)):
+    if user.get("dev"):
+        raise HTTPException(400, "The local test admin can't use two-step verification. Create a real account.")
+    if mfa.is_on(user["login_id"]):
+        raise HTTPException(400, "Two-step verification is already on.")
+    return mfa.start(user["login_id"])
+
+
+class Code(BaseModel):
+    code: str
+
+
+@app.post("/me/mfa/enable")
+def my_mfa_enable(body: Code, user: dict = Depends(auth.current_user)):
+    codes = mfa.enable(user["login_id"], body.code)
+    if not codes:
+        raise HTTPException(400, "That code isn't right. Check that your phone's clock is correct and try again.")
+    _audit(user, "Turned on two-step verification", user["login_id"])
+    return {"recovery": codes}
+
+
+@app.post("/me/mfa/disable")
+def my_mfa_disable(body: PasswordReset, user: dict = Depends(auth.current_user)):
+    if mfa.required(user["role"]):
+        raise HTTPException(400, "Two-step verification is required for your role.")
+    if not auth.verify(user["login_id"], body.password):
+        raise HTTPException(400, "Your password is wrong.")
+    mfa.remove(user["login_id"])
+    _audit(user, "Turned off two-step verification", user["login_id"])
+    return {"ok": True}
+
+
+@app.get("/accounts/mfa")
+def accounts_mfa(admin: dict = Admin):
+    """Who has two-step verification on, for the Users list."""
+    return [u["login_id"] for u in store.list_of("users") if u.get("login_id") and mfa.is_on(u["login_id"])]
+
+
+@app.delete("/accounts/{login_id}/mfa")
+def reset_mfa(login_id: str, admin: dict = Admin):
+    """For a lost phone: the person signs in with the password and sets it up again."""
+    mfa.remove(login_id)
+    _audit(admin, "Reset two-step verification", login_id)
     return {"ok": True}
 
 
@@ -240,6 +346,7 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
         _check_user_change(user, None, old)
         if old.get("login_id"):
             store.delete_credential(str(old["login_id"]))
+            mfa.remove(str(old["login_id"]))
             _forget_owner(str(old["login_id"]))
         _audit(user, "Deleted user", f"{old.get('name', '')} ({old.get('login_id', '')})")
     if kind == "deadlines":

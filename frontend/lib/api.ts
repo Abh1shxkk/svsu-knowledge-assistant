@@ -48,6 +48,7 @@ export type QualityReport = {
   answered_correctly: number; correct_by_style: Record<string, number>; misses: { question: string; answer: string; got: string; found: boolean }[];
 };
 
+export type MfaStart = { secret: string; uri: string; qr: string };
 export type KeyStatus = { source: "admin" | "env" | "none"; last4: string; by?: string; at?: string };
 
 export type Extracted = {
@@ -60,8 +61,18 @@ export type Extracted = {
 export type SessionUser = { login_id: string; name: string; email: string; role: string; dept?: string; dev?: boolean; employee_id?: number };
 
 export const api = {
+  /** A session, or (with two-step verification) a ticket for the code step: mfa "code" or "setup". */
   login: (login_id: string, password: string) =>
-    call<{ token: string; user: SessionUser }>("/login", jsonBody("POST", { login_id, password })),
+    call<{ token?: string; user?: SessionUser; mfa?: "code" | "setup"; ticket?: string }>("/login", jsonBody("POST", { login_id, password })),
+  loginMfa: (ticket: string, code: string) =>
+    call<{ token: string; user: SessionUser; recovery?: string[] }>("/login/mfa", jsonBody("POST", { ticket, code })),
+  loginMfaSetup: (ticket: string) => call<MfaStart>("/login/mfa/setup", jsonBody("POST", { ticket })),
+  myMfa: () => call<{ on: boolean; required: boolean; recovery_left: number }>("/me/mfa"),
+  mfaSetup: () => call<MfaStart>("/me/mfa/setup", { method: "POST" }),
+  mfaEnable: (code: string) => call<{ recovery: string[] }>("/me/mfa/enable", jsonBody("POST", { code })),
+  mfaDisable: (password: string) => call<{ ok: boolean }>("/me/mfa/disable", jsonBody("POST", { password })),
+  mfaUsers: () => call<string[]>("/accounts/mfa"),
+  resetMfa: (login_id: string) => call<{ ok: boolean }>(`/accounts/${encodeURIComponent(login_id)}/mfa`, { method: "DELETE" }),
   me: () => call<SessionUser>("/me"),
   records: () => call<Records>("/records"),
   put: (kind: Kind, id: string, data: unknown) => call(`/records/${kind}/${encodeURIComponent(id)}`, jsonBody("PUT", data)),

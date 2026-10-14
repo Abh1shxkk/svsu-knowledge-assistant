@@ -208,6 +208,7 @@ table.t tr:last-child td{border-bottom:0}
 .libbar .search svg{position:absolute;left:10px;top:10px;color:var(--fg-3)}
 .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .filters .fld>label{font-size:11.5px}
+.filters .check-fld{justify-content:flex-end;gap:2px;font-size:13px;cursor:pointer}
 .drow{display:grid;grid-template-columns:44px minmax(0,2.6fr) minmax(0,1.2fr) 110px 110px;gap:14px;align-items:center;padding:12px 16px;border:0;border-bottom:1px solid var(--line);background:transparent;width:100%;text-align:left}
 .drow:hover{background:var(--surface-2)}
 .drow:last-child{border-bottom:0}
@@ -773,3 +774,10 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .faillist{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 .kpis3{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:700px){.kpis3{grid-template-columns:1fr}}
+
+/* two-step verification */
+.mfa-setup{display:flex;flex-direction:column;gap:12px}
+.mfa-setup ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.mfa-qr{background:#fff;border-radius:8px;padding:6px;border:1px solid var(--line)}
+.mfa-key{font-size:13px;word-break:break-all;margin-top:2px}
+.mfa-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;padding:12px;border:1px dashed var(--line-2);border-radius:8px;font-size:14px}

@@ -89,7 +89,9 @@ export default function DocDetail() {
       {tab === "text" && (
         <>
           <div className="row between"><p className="sm muted">{d.fileType === "scan" ? `Text from the OCR layer (${d.ocr}% confidence). Check against the scan before relying on figures.` : "Text extracted from the file. This is what the assistant searches."}</p>
-            <button className="btn sm" disabled={!full} onClick={() => { if (full) { navigator.clipboard?.writeText(docText(full)); toast("Copied"); } }} type="button"><Icon n="copy" s /> Copy text</button></div>
+            <button className="btn sm" disabled={!full} onClick={() => { if (full) { navigator.clipboard?.writeText(docText(full)); toast("Copied"); } }} type="button"><Icon n="copy" s /> Copy text</button>
+            {editable && full && !!d.unsure?.length && <button className="btn sm" type="button" title="The highlighted words are correct as they are"
+              onClick={async () => { if (await save("documents", { ...d, pages: full.pages, unsure: [] })) toast("Marked as checked"); }}><Icon n="check" s /> Mark as checked</button>}</div>
           {full?.pages ? (
             <TextReview pages={full.pages} unsure={d.unsure} lang={d.lang} editable={editable} onSave={async (pages) => {
               const versions = [...d.versions, { v: (parseFloat(d.versions[d.versions.length - 1]?.v ?? "1.0") + 0.1).toFixed(1), date: todayIso(), by: me(s).name, note: "Text corrected" }];

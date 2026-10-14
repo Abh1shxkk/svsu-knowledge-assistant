@@ -11,10 +11,10 @@ import { Ft, Pill, Tags } from "@/components/ui";
 import type { Doc } from "@/lib/types";
 
 type Lib = {
-  q: string; subject: string; dept: string; aud: string; type: string; status: string;
+  q: string; subject: string; dept: string; aud: string; type: string; status: string; check: boolean;
   vis: string; from: string; to: string; sort: "new" | "old" | "eff" | "title"; view: "list" | "grid"; showFilters: boolean;
 };
-const BLANK: Lib = { q: "", subject: "", dept: "", aud: "", type: "", status: "", vis: "", from: "", to: "", sort: "new", view: "list", showFilters: true };
+const BLANK: Lib = { q: "", subject: "", dept: "", aud: "", type: "", status: "", check: false, vis: "", from: "", to: "", sort: "new", view: "list", showFilters: true };
 
 export default function LibraryPage() {
   return <Suspense><Library /></Suspense>;
@@ -25,7 +25,7 @@ function Library() {
   const L2 = lists(s);
   const params = useSearchParams();
   // Seed search/status from the link once (e.g. a dashboard KPI or the top-bar search).
-  const [L, setL] = useState<Lib>(() => ({ ...BLANK, q: params.get("q") ?? "", status: params.get("status") ?? "" }));
+  const [L, setL] = useState<Lib>(() => ({ ...BLANK, q: params.get("q") ?? "", status: params.get("status") ?? "", check: params.has("check") }));
 
   // Searching the text inside documents happens on the server; the details are matched here too.
   const q = L.q.trim().toLowerCase();
@@ -53,6 +53,8 @@ function Library() {
     title: (a, b) => a.title.localeCompare(b.title), eff: (a, b) => (b.effective || "").localeCompare(a.effective || ""),
   };
   ds = [...ds].sort(sorters[L.sort]);
+  // Scans with words OCR was unsure of, the most first, to correct with Edit text.
+  if (L.check) ds = ds.filter((d) => d.unsure?.length).sort((a, b) => b.unsure!.length - a.unsure!.length);
 
   const set = (patch: Partial<Lib>) => setL((p) => ({ ...p, ...patch }));
   const sel = (k: keyof Lib, label: string, arr: string[]) => (
@@ -88,6 +90,8 @@ function Library() {
             {sel("vis", "Visibility", L2.VIS)}
             <div className="fld"><label>Dated from</label><input type="date" className="inp" value={L.from} onChange={(e) => set({ from: e.target.value })} /></div>
             <div className="fld"><label>Dated to</label><input type="date" className="inp" value={L.to} onChange={(e) => set({ to: e.target.value })} /></div>
+            {canUpload(s) && <label className="fld check-fld"><span><input type="checkbox" checked={L.check} onChange={(e) => set({ check: e.target.checked })} /> Needs a text check</span>
+              <span className="xs muted">Scans with words the OCR was unsure of</span></label>}
           </div>
           <div className="row between" style={{ marginTop: 12 }}>
             <span className="sm muted">{plural(ds.length, "document")}</span>
@@ -116,7 +120,8 @@ function Library() {
           {ds.map((d) => (
             <Link key={d.id} className="drow" href={`/library/${d.id}`}>
               <Ft k={d.fileType} />
-              <div className="tt" style={{ minWidth: 0 }}><b>{d.title}</b><span className="mono">{d.ref}</span> <span>· {d.type}</span><div style={{ marginTop: 5 }}><Tags tags={d.tags} /></div></div>
+              <div className="tt" style={{ minWidth: 0 }}><b>{d.title}</b><span className="mono">{d.ref}</span> <span>· {d.type}</span>
+                {canUpload(s) && !!d.unsure?.length && <span className="pill warn plain" style={{ marginLeft: 6 }}>{plural(d.unsure.length, "word")} to check</span>}<div style={{ marginTop: 5 }}><Tags tags={d.tags} /></div></div>
               <div className="c3 sm" style={{ minWidth: 0 }}><div>{d.dept}</div><div className="muted xs">{d.audience.join(", ")}</div></div>
               <div className="c4 sm num">{fmtD(d.date)}<div className="xs muted">{d.visibility}</div></div>
               <div><Pill status={d.status} /></div>

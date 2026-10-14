@@ -219,7 +219,9 @@ def suggest(pages: list[list[dict]], filename: str, lists: dict) -> dict:
         "You catalogue official documents of Swami Vivekanand Subharti University. Suggest this document's "
         "details. Reply as JSON with keys title, ref (reference or letter number exactly as printed), type, "
         "authority, dept, date, effective, expiry (dates as YYYY-MM-DD), audience (list), tags (list), "
-        "visibility, description (one sentence). Pick type from TYPES, authority from AUTHS, dept from DEPTS, "
+        "visibility, description (one sentence). expiry is the last day the document applies: for a notice "
+        "about one event, exam, meeting or deadline, the last date of that event; for standing rules or policies "
+        "with no end date, \"\". Pick type from TYPES, authority from AUTHS, dept from DEPTS, "
         "audience from AUDS, tags from TAGS and visibility from VIS. Use \"\" or [] when the text doesn't say.\n"
         + json.dumps(choices, ensure_ascii=False),
         f"File name: {filename}\n\n{text}", as_json=True)

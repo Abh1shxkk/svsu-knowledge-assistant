@@ -62,6 +62,6 @@ export type Records = {
   documents: Doc[]; collections: Collection[]; deadlines: Deadline[]; chats: Chat[];
   bm_answers: BmAnswer[]; bm_passages: BmPassage[]; feedback: Feedback[]; unanswered: Unanswered[];
   conflicts: Conflict[]; users: User[]; audit: Audit[]; reminders: Reminder[]; prefs: Prefs[];
-  settings: ({ id: "lists" } & Lists | { id: "ai" } & AiSettings | { id: "roles"; matrix: Record<string, number[]> })[];
+  settings: ({ id: "lists" } & Lists | { id: "ai" } & AiSettings | { id: "roles"; matrix: Record<string, number[]> } | { id: "security"; requireMfa: boolean })[];
 };
 export type Kind = keyof Records;

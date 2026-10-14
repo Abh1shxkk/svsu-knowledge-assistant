@@ -23,6 +23,12 @@ export default function AdminPage() {
   const saveAi = async (patch: Partial<AiSettings>) => { if (await save("settings", { id: "ai", ...ai, ...patch })) toast("AI settings saved"); };
   const self = (u: User) => u.login_id === s.session?.login_id;
   const docsWith = (fn: (d: typeof s.documents[number]) => boolean) => s.documents.filter(fn).length;
+  const requireMfa = s.settings.some((x) => x.id === "security" && x.requireMfa);
+  const [mfaOn, setMfaOn] = useState<string[]>([]);
+  useEffect(() => { api.mfaUsers().then(setMfaOn, () => setMfaOn([])); }, []);
+  const resetMfa = (u: User) => openModal({ title: "Reset two-step verification?", body: <p>Use this when <b>{u.name}</b> has lost their phone and recovery codes. They sign in with their password and set it up again.</p>,
+    foot: <><button className="btn" onClick={closeModal} type="button">Cancel</button>
+      <button className="btn danger" type="button" onClick={async () => { closeModal(); await api.resetMfa(u.login_id!); setMfaOn(mfaOn.filter((x) => x !== u.login_id)); toast(`Two-step verification reset for ${u.name}`); }}>Reset</button></> });
 
   return (
     <div className="wrap">
@@ -33,14 +39,18 @@ export default function AdminPage() {
         <>
           <div className="card"><div className="card-h"><h3>Users and roles</h3>
             <button className="btn sm pri" onClick={() => openModal({ title: "Add user", body: <AddUser /> })} type="button"><Icon n="plus" s /> Add user</button></div>
-            <div className="table-wrap"><table className="t"><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Last active</th><th>Status</th><th /></tr></thead>
+            <div className="table-wrap"><table className="t"><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Last active</th><th>Two-step</th><th>Status</th><th /></tr></thead>
               <tbody>{s.users.map((u) => (
                 <tr key={u.id}><td><div className="row" style={{ flexWrap: "nowrap" }}><span className="av">{initials(u.name)}</span><div><b style={{ fontWeight: 500 }}>{u.name}</b><div className="xs muted">{u.email}</div></div></div></td>
                   <td>{u.dept}</td>
                   <td><select className="inp" style={{ width: "auto", padding: "4px 8px" }} value={u.role} disabled={self(u)} title={self(u) ? "You can't change your own role" : undefined}
                     onChange={async (e) => { const role = e.target.value; if (await save("users", { ...u, role })) toast(`${u.name} is now ${role}`); }}>
                     {ROLES.map((r) => <option key={r}>{r}</option>)}</select></td>
-                  <td>{u.last}</td><td>{u.active ? <span className="pill ok">Active</span> : <span className="pill mute">Deactivated</span>}</td>
+                  <td>{u.last}</td>
+                  <td>{u.login_id && mfaOn.includes(u.login_id)
+                    ? <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}><span className="pill ok">On</span><button className="btn sm ghost" type="button" onClick={() => resetMfa(u)}>Reset</button></span>
+                    : <span className="pill mute">Off</span>}</td>
+                  <td>{u.active ? <span className="pill ok">Active</span> : <span className="pill mute">Deactivated</span>}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     {u.login_id && <button className="btn sm" onClick={() => openModal({ title: "Reset password", body: <ResetPassword loginId={u.login_id!} name={u.name} /> })} type="button">Reset password</button>}{" "}
                     <button className="btn sm" onClick={() => openModal({ title: "Edit user", body: <EditUser u={u} /> })} type="button">Edit</button>{" "}
@@ -52,6 +62,13 @@ export default function AdminPage() {
                     </>}</td>
                 </tr>
               ))}</tbody></table></div></div>
+          <div className="card"><div className="card-h"><h3>Sign-in security</h3></div>
+            <label className="li" style={{ cursor: "pointer" }}>
+              <div className="main"><b>Require two-step verification for Administrators and Approvers</b>
+                <span style={{ whiteSpace: "normal" }}>They set it up the next time they sign in. Five wrong passwords or codes in a row always lock that account&apos;s sign-in for 5 minutes.</span></div>
+              <input type="checkbox" checked={requireMfa} style={{ width: 18, height: 18 }} aria-label="Require two-step verification"
+                onChange={async (e) => { if (await save("settings", { id: "security", requireMfa: e.target.checked })) toast(e.target.checked ? "Two-step verification required" : "Two-step verification optional"); }} /></label>
+          </div>
           <div className="card"><div className="card-h"><h3>What each role can do</h3></div>
             <div className="table-wrap"><table className="t"><thead><tr><th>Role</th><th>Ask &amp; view</th><th>Upload</th><th>Approve</th><th>Manage users</th></tr></thead>
               <tbody>{CAPS.map(([r, a]) => <tr key={r}><td>{r}</td>{a.map((x, i) => <td key={i}>{x ? <span style={{ color: "var(--green)" }}><Icon n="check" s /></span> : <span className="muted">—</span>}</td>)}</tr>)}</tbody></table></div></div>

@@ -439,3 +439,66 @@ def test_distinctive_words_are_matched_exactly(client, people):
     assert put(client, ap, "documents", doc("HW2", status="Active", pages=target)).status_code == 200
     terms = rag.search_terms(["मुख्य संयोजक कौन हैं?"], ["HW1", "HW2"])
     assert "संयोजक" in terms and "विश्वविद्यालय" not in terms
+
+
+def test_documents_past_expiry_become_expired_automatically(client, people):
+    from datetime import date
+    from app import jobs, store
+    ap = people["Approver"]
+    assert put(client, ap, "documents", doc("EXP1", status="Active", expiry="2026-10-10")).status_code == 200
+    assert put(client, ap, "documents", doc("EXP2", status="Active", expiry="2026-10-20")).status_code == 200
+    jobs.expire_documents(date(2026, 10, 14))
+    d1, d2 = store.get("documents", "EXP1"), store.get("documents", "EXP2")
+    assert d1["status"] == "Expired" and d1["approvals"][-1]["step"] == "Expired automatically"
+    assert d2["status"] == "Active"
+
+
+def test_two_step_sign_in_with_codes_recovery_codes_and_admin_reset(client, admin):
+    import pyotp
+    assert client.post("/accounts", headers=admin, json={
+        "login_id": "t-mfa", "name": "Two Step", "dept": "Examination", "role": "Viewer", "password": "Password-123"}).status_code == 200
+    me = login(client, "t-mfa", "Password-123")
+    secret = client.post("/me/mfa/setup", headers=me).json()["secret"]
+    assert client.post("/me/mfa/enable", headers=me, json={"code": "000000"}).status_code == 400
+    recovery = client.post("/me/mfa/enable", headers=me, json={"code": pyotp.TOTP(secret).now()}).json()["recovery"]
+    assert len(recovery) == 8
+
+    r = client.post("/login", json={"login_id": "t-mfa", "password": "Password-123"}).json()
+    assert r["mfa"] == "code" and "token" not in r
+    assert client.get("/me", headers={"Authorization": "Bearer " + r["ticket"]}).status_code == 401  # not a session
+    assert client.post("/login/mfa", json={"ticket": r["ticket"], "code": "123456"}).status_code == 401
+    assert "token" in client.post("/login/mfa", json={"ticket": r["ticket"], "code": pyotp.TOTP(secret).now()}).json()
+    assert "token" in client.post("/login/mfa", json={"ticket": r["ticket"], "code": recovery[0]}).json()
+    assert client.post("/login/mfa", json={"ticket": r["ticket"], "code": recovery[0]}).status_code == 401  # used up
+
+    assert "t-mfa" in client.get("/accounts/mfa", headers=admin).json()
+    assert client.delete("/accounts/t-mfa/mfa", headers=admin).status_code == 200
+    assert "token" in client.post("/login", json={"login_id": "t-mfa", "password": "Password-123"}).json()
+
+
+def test_repeated_wrong_passwords_lock_sign_in(client, admin):
+    from app import mfa
+    assert client.post("/accounts", headers=admin, json={
+        "login_id": "t-lock", "name": "Lock", "dept": "Examination", "role": "Viewer", "password": "Password-123"}).status_code == 200
+    for _ in range(mfa.MAX_TRIES):
+        assert client.post("/login", json={"login_id": "t-lock", "password": "wrong-pass-1"}).status_code == 401
+    assert client.post("/login", json={"login_id": "t-lock", "password": "Password-123"}).status_code == 429
+    mfa.succeeded("t-lock")  # the lock lifts after 5 minutes
+    assert client.post("/login", json={"login_id": "t-lock", "password": "Password-123"}).status_code == 200
+
+
+def test_required_two_step_is_set_up_during_sign_in(client, admin, people):
+    import pyotp
+    assert put(client, admin, "settings", {"id": "security", "requireMfa": True}).status_code == 200
+    try:
+        r = client.post("/login", json={"login_id": "t-approver", "password": "Password-123"}).json()
+        assert r["mfa"] == "setup"
+        secret = client.post("/login/mfa/setup", json={"ticket": r["ticket"]}).json()["secret"]
+        done = client.post("/login/mfa", json={"ticket": r["ticket"], "code": pyotp.TOTP(secret).now()}).json()
+        assert done["token"] and len(done["recovery"]) == 8
+        assert "token" in client.post("/login", json={"login_id": "t-viewer", "password": "Password-123"}).json()  # not required
+        ap = {"Authorization": "Bearer " + done["token"]}
+        assert client.post("/me/mfa/disable", headers=ap, json={"password": "Password-123"}).status_code == 400
+    finally:
+        put(client, admin, "settings", {"id": "security", "requireMfa": False})
+        client.delete("/accounts/t-approver/mfa", headers=admin)
