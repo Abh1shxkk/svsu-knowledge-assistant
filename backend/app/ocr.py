@@ -5,6 +5,7 @@ Hindi (Devanagari) pages with Hindi, English (Latin) pages with English, unclear
 """
 import io
 import os
+import statistics
 
 import pytesseract
 from PIL import Image
@@ -38,21 +39,34 @@ def _script(img: Image.Image) -> str:
 
 
 def _tesseract(img: Image.Image, lang: str) -> tuple[str, int, str]:
-    """Rebuild lines and paragraphs from Tesseract's word boxes, so paragraphs survive OCR."""
+    """Rebuild the page from where each word sits, not from Tesseract's own blocks: Tesseract reads a
+    table column by column, which separates every date from its subject. Words on the same line of the
+    page become one line (table cells joined with " | "), and a large vertical gap starts a paragraph."""
     d = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.DICT)
-    out, line_key, para_key, confs = [], None, None, []
-    for i, word in enumerate(d["text"]):
-        if not word.strip():
-            continue
-        para, line = (d["block_num"][i], d["par_num"][i]), (d["block_num"][i], d["par_num"][i], d["line_num"][i])
-        if para_key is not None and para != para_key:
-            out.append("\n\n")
-        elif line_key is not None and line != line_key:
-            out.append("\n")
-        elif out:
-            out.append(" ")
-        out.append(word)
-        para_key, line_key = para, line
-        if float(d["conf"][i]) >= 0:
-            confs.append(float(d["conf"][i]))
-    return "".join(out), round(sum(confs) / len(confs)) if confs else 0, "tesseract"
+    words = [(d["left"][i], d["top"][i], d["width"][i], d["height"][i], w.strip())
+             for i, w in enumerate(d["text"]) if w.strip()]
+    confs = [float(c) for c, w in zip(d["conf"], d["text"]) if w.strip() and float(c) >= 0]
+    if not words:
+        return "", 0, "tesseract"
+    h = statistics.median(w[3] for w in words)  # typical word height: the yardstick for gaps
+    rows: list[dict] = []
+    for w in sorted(words, key=lambda w: w[1] + w[3] / 2):
+        mid = w[1] + w[3] / 2
+        if rows and abs(mid - rows[-1]["mid"]) <= 0.55 * h:
+            row = rows[-1]
+            row["words"].append(w)
+            row["mid"] = sum(x[1] + x[3] / 2 for x in row["words"]) / len(row["words"])
+            row["bottom"] = max(row["bottom"], w[1] + w[3])
+        else:
+            rows.append({"mid": mid, "top": w[1], "bottom": w[1] + w[3], "words": [w]})
+    lines, prev_bottom = [], None
+    for row in rows:
+        ws = sorted(row["words"])
+        line = ws[0][4]
+        for a, b in zip(ws, ws[1:]):
+            line += (" | " if b[0] - (a[0] + a[2]) > 2.2 * h else " ") + b[4]  # wide gap = next column
+        if prev_bottom is not None and row["top"] - prev_bottom > 1.3 * h:
+            lines.append("")
+        lines.append(line)
+        prev_bottom = row["bottom"]
+    return "\n".join(lines), round(sum(confs) / len(confs)) if confs else 0, "tesseract"

@@ -37,14 +37,14 @@ def extract(filename: str, raw: bytes) -> dict:
         pages = [_paras(p.get_text()) for p in pdf]
         if sum(map(len, pages)) == 0:  # no text layer: a scan, so OCR the page images
             scans = [ocr.read(p.get_pixmap(dpi=300).tobytes("png")) for p in list(pdf)[:_MAX_OCR_PAGES]]
-            kind, pages = "scan", [_paras(t) for t, _, _ in scans]
+            kind, pages = "scan", [_paras(t, keep_lines=True) for t, _, _ in scans]
     elif kind == "docx":
         pages = _paginate([p.text for p in Document(io.BytesIO(raw)).paragraphs])
     elif kind == "xlsx":
         pages = [_rows(raw, suffix)]
     elif kind == "img":
         scans = [ocr.read(raw)]
-        pages = _paginate(_paras(scans[0][0]))
+        pages = _paginate(_paras(scans[0][0], keep_lines=True))
     else:
         pages = _paginate(_paras(raw.decode("utf-8", "ignore")))
     return {
@@ -60,10 +60,14 @@ def text_hash(pages: list[list[dict]]) -> str:
     return hashlib.sha256(" ".join(text.lower().split()).encode()).hexdigest() if text.strip() else ""
 
 
-def _paras(text: str) -> list[str]:
+def _paras(text: str, keep_lines: bool = False) -> list[str]:
+    """Paragraphs are separated by blank lines. keep_lines (OCR): a paragraph keeps its line breaks,
+    so each row of a scanned table stays one line instead of running into the next."""
     parts = re.split(r"\n\s*\n", text)
-    if len(parts) < 3:  # no blank lines between paragraphs: fall back to lines
+    if len(parts) < 3 and not keep_lines:  # no blank lines between paragraphs: fall back to lines
         parts = text.splitlines()
+    if keep_lines:
+        return ["\n".join(" ".join(ln.split()) for ln in p.splitlines() if ln.strip()) for p in parts if p.strip()]
     return [" ".join(p.split()) for p in parts if p.strip()]
 
 

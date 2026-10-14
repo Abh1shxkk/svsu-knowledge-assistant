@@ -750,3 +750,4 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .dpick .cited-mark{color:var(--accent);flex:none;margin-top:2px}
 .csec{display:flex;flex-direction:column;gap:12px}
 .coll.auto .ask{color:var(--accent);display:inline-flex;gap:4px;align-items:center;font-weight:500}
+.paper.scan .blk{white-space:pre-line}  /* OCR keeps table rows as separate lines */
