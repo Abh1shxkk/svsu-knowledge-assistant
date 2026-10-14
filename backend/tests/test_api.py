@@ -276,3 +276,18 @@ def test_original_file_is_kept_shown_to_permitted_people_and_removed_with_the_do
     assert client.delete("/records/documents/OF1", headers=admin).status_code == 200
     from app import store
     assert not store.has_file(ex["file"]["key"])
+
+
+def test_pdf_pages_are_served_as_pictures_to_permitted_people(client, people):
+    import pymupdf
+    up, v = people["Uploader"], people["Viewer"]
+    pdf = pymupdf.open()
+    for i in range(2):
+        pdf.new_page().insert_text((72, 72), f"Page {i + 1} of the notice about hostel timings.")
+    ex = client.post("/extract", headers=up, files={"file": ("n.pdf", io.BytesIO(pdf.tobytes()), "application/pdf")}).json()
+    assert ex["file"]["pages"] == 2
+    assert put(client, up, "documents", doc("PG1", status="Pending", file=ex["file"])).status_code == 200
+    r = client.get("/documents/PG1/file/page/2", headers=up)
+    assert r.status_code == 200 and r.content[1:4] == b"PNG"
+    assert client.get("/documents/PG1/file/page/3", headers=up).status_code == 404
+    assert client.get("/documents/PG1/file/page/1", headers=v).status_code == 404   # not published

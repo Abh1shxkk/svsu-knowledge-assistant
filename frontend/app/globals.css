@@ -757,7 +757,6 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .hrow:hover .del,.hrow .del:focus-visible{opacity:1}
 @media (hover:none){.hrow .del{opacity:.6}}
 /* The original uploaded file */
-.orig-body{padding:0;align-items:stretch}
-.orig{flex:1;width:100%;min-height:70vh;border:0;background:#fff}
-.orig-img{max-width:100%;height:auto;margin:auto;background:#fff}
+.orig-img{max-width:none;height:auto;background:#fff;box-shadow:var(--shadow);border-radius:4px;flex:none}
+.orig-wait{min-height:50vh;display:grid;place-items:center}
 .cstep .q .link{display:block;margin-top:4px}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ANSWERABLE_ST, canApprove, canEditDoc, canUpload, getDoc, isAdmin, isMine, lists, me, useFullDoc, useStore } from "@/lib/store";
 import { Pages, docText } from "@/components/paper";
-import { DownloadOriginal, OriginalFile } from "@/components/original";
+import { DownloadOriginal, OriginalPages } from "@/components/original";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
 import { Ft, Note, Pill, Tabs, DateBox, Due } from "@/components/ui";
@@ -83,7 +83,7 @@ export default function DocDetail() {
 
       {tab === "overview" && <Overview d={d} full={full} approver={approver} />}
       {tab === "preview" && (d.file
-        ? <div className="pagesbox orig-body"><OriginalFile doc={d} /></div>
+        ? <div className="pagesbox"><OriginalPages doc={d} /></div>
         : <div className="pagesbox">{full ? <Pages doc={full} onBookmark={(page, block) => bookmarkPassage(full, page, block)} /> : <span className="spin" />}</div>)}
       {tab === "text" && (
         <>

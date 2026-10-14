@@ -12,7 +12,7 @@ export type Doc = {
   /** Full text. Lists leave it out; open a document (useFullDoc) to get it. */
   pages?: Block[][]; ocr?: number; sample?: boolean; uploader_id?: string;
   /** The original uploaded file (older documents may not have one). */
-  file?: { key: string; name: string; mime: string };
+  file?: { key: string; name: string; mime: string; pages?: number };
 };
 
 /** owner is the creator's Login ID (set by the server); ownerName is shown. */

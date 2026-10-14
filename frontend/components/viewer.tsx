@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getDoc, useFullDoc, useStore } from "@/lib/store";
 import { fmtD, nid, todayIso } from "@/lib/util";
 import { Icon } from "./icon";
-import { DownloadOriginal, OriginalFile } from "./original";
+import { DownloadOriginal, OriginalFile, originalPages } from "./original";
 import { Pages } from "./paper";
 import { Pill } from "./ui";
 
@@ -38,11 +38,11 @@ export function Viewer() {
     const c = cites[idx + d];
     if (c) openViewer({ ...v, doc: c.doc, page: c.page, block: c.block, quote: c.quote, idx: idx + d });
   };
-  const pageCount = doc.pages?.length ?? 1;
+  const pageCount = showOriginal ? originalPages(doc) : doc.pages?.length ?? 1;
   const goPage = (d: number) => {
     const page = Math.min(pageCount, Math.max(1, (v.page ?? 1) + d));
     openViewer({ ...v, page });
-    bodyRef.current?.querySelector(`[data-page="${page}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!showOriginal) bodyRef.current?.querySelector(`[data-page="${page}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const zoom = (d: number) => openViewer({ ...v, zoom: Math.min(1.6, Math.max(0.6, +(v.zoom + d).toFixed(1))) });
   const bookmark = async () => {
@@ -82,22 +82,20 @@ export function Viewer() {
               <button role="tab" aria-selected={!showOriginal} className={!showOriginal ? "on" : ""} onClick={() => setView("text")} type="button">Text</button>
             </div>
           )}
-          {!showOriginal && <>
           <button className="btn sm" aria-label="Previous page" disabled={(v.page ?? 1) <= 1} onClick={() => goPage(-1)} type="button"><Icon n="cl" s /></button>
           <span className="pg">Page {v.page ?? 1} / {pageCount}</span>
           <button className="btn sm" aria-label="Next page" disabled={(v.page ?? 1) >= pageCount} onClick={() => goPage(1)} type="button"><Icon n="cr" s /></button>
           <button className="btn sm" aria-label="Zoom out" onClick={() => zoom(-0.1)} type="button"><Icon n="zout" s /></button>
           <span className="pg">{Math.round(v.zoom * 100)}%</span>
           <button className="btn sm" aria-label="Zoom in" onClick={() => zoom(0.1)} type="button"><Icon n="zin" s /></button>
-          </>}
           <span style={{ flex: 1 }} />
           {showOriginal && <DownloadOriginal doc={doc} small />}
           {hl && <button className="btn sm" onClick={bookmark} type="button"><Icon n="bm" s /> Bookmark passage</button>}
           <Link className="btn sm" href={`/library/${doc.id}`} onClick={closeViewer}><Icon n="open" s /> Details</Link>
         </div>
       </div>
-      <div className={`vbody ${showOriginal ? "orig-body" : ""}`} ref={bodyRef}>
-        {showOriginal ? <OriginalFile doc={doc} page={v.page ?? 1} /> : <Pages doc={doc} hl={hl} zoom={v.zoom} />}
+      <div className="vbody" ref={bodyRef}>
+        {showOriginal ? <OriginalFile doc={doc} page={Math.min(v.page ?? 1, pageCount)} zoom={v.zoom} /> : <Pages doc={doc} hl={hl} zoom={v.zoom} />}
       </div>
       <div className="vfoot">
         {showOriginal ? <span>The original file as uploaded{hl ? `, at page ${v.page}. Use Text to see the cited passage highlighted.` : "."}</span>

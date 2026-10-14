@@ -7,6 +7,7 @@ import uuid
 from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, timedelta
 from pathlib import Path
+import pymupdf
 from fastapi import Body, Depends, FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -278,6 +279,8 @@ def extract_file(file: UploadFile, user: dict = Depends(auth.require_role(*polic
     mime = _MIME.get(Path(file.filename).suffix.lower(), "application/octet-stream")
     store.put_file(key, file.filename, mime, raw)
     res["file"] = {"key": key, "name": file.filename, "mime": mime}
+    if mime == "application/pdf":
+        res["file"]["pages"] = len(pymupdf.open(stream=raw, filetype="pdf"))
     lists = _setting("lists")
     res["suggestion"] = extract.suggest(res["pages"], file.filename, lists)
     res["duplicate"] = _duplicate(user, extract.text_hash(res["pages"]), res["suggestion"].get("ref", ""))
@@ -294,6 +297,20 @@ def document_file(doc_id: str, user: dict = Depends(auth.current_user)):
     name, mime, data = stored
     safe = re.sub(r"[^\w.\- ]", "_", name)
     return Response(data, media_type=mime, headers={"Content-Disposition": f'inline; filename="{safe}"'})
+
+
+@app.get("/documents/{doc_id}/file/page/{n}")
+def document_page_image(doc_id: str, n: int, user: dict = Depends(auth.current_user)):
+    """One page of the original PDF as a picture, so every browser (phones included) shows it the same."""
+    f = _visible_doc(user, doc_id).get("file")
+    stored = store.get_file(f["key"]) if f else None
+    if not stored or stored[1] != "application/pdf":
+        raise HTTPException(404, "No original PDF for this document.")
+    pdf = pymupdf.open(stream=stored[2], filetype="pdf")
+    if not 1 <= n <= len(pdf):
+        raise HTTPException(404, "No such page.")
+    png = pdf[n - 1].get_pixmap(dpi=144).tobytes("png")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.post("/documents/{doc_id}/deadlines")
