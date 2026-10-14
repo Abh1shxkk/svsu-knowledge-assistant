@@ -1,6 +1,8 @@
 """The app's data in PostgreSQL: JSON records grouped by kind, plus password hashes."""
 from sqlalchemy import Column, Integer, LargeBinary, String, Table, UniqueConstraint, case, cast, func, literal_column, select, Text
 from sqlalchemy.dialects.postgresql import JSONB, insert
+import uuid
+from datetime import datetime
 
 from .database import engine, meta
 
@@ -145,3 +147,14 @@ def has_file(key: str) -> bool:
 def delete_file(key: str) -> None:
     with engine.begin() as c:
         c.execute(files.delete().where(files.c.key == key))
+
+
+def stamp(t: datetime) -> str:
+    """"14 Oct 2026, 3:05 PM" — how times are shown in the audit log and user lists."""
+    return t.strftime("%d %b %Y, %I:%M %p").lstrip("0")
+
+
+def audit(who: str, act: str, what: str) -> None:
+    now, entry_id = datetime.now(), uuid.uuid4().hex
+    put("audit", entry_id, {"id": entry_id, "t": stamp(now), "at": now.isoformat(timespec="seconds"),
+                            "who": who, "act": act, "what": what})

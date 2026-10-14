@@ -4,7 +4,7 @@ import hashlib
 import os
 
 os.environ.update({
-    "DB_NAME": "svsu_test", "DATABASE_URL": "", "DEMO_DATA": "false", "SMTP_HOST": "",
+    "DB_NAME": "svsu_test", "DATABASE_URL": "", "DEMO_DATA": "false", "SMTP_HOST": "", "RUN_WORKER": "false",
     "DEV_ADMIN_USER": "testadmin", "DEV_ADMIN_PASS": "test-admin-pass-1",
     "JWT_SECRET": "test-secret-not-used-anywhere-else-0123456789",
 })
@@ -13,7 +13,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
-from app import extract, main, rag  # noqa: E402
+from app import evaluate, extract, main, rag  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.database import engine  # noqa: E402
 
@@ -28,7 +28,11 @@ def fake_embed(texts, batch=256):
     return out
 
 
-def fake_chat(system, user, as_json=False, model=None):
+def fake_chat(system, user, as_json=False, model=None, temperature=None):
+    if "write test questions" in system:
+        return {"question": "How many casual leaves can staff take?", "answer": "12 days"}
+    if "You check a search assistant" in system:
+        return {"correct": "Twelve days" in user}
     if "search queries" in system:
         return {"queries": []}
     if "Excerpts:" in user:
@@ -41,10 +45,10 @@ def fake_chat(system, user, as_json=False, model=None):
 
 @pytest.fixture(scope="session")
 def client():
-    rag.embed = fake_embed
-    rag.chat = extract.chat = fake_chat
+    rag.embed = evaluate.embed = fake_embed
+    rag.chat = extract.chat = evaluate.chat = fake_chat
     with engine.begin() as c:
-        c.execute(text("TRUNCATE records, credentials, blocks, secrets, files"))
+        c.execute(text("TRUNCATE records, credentials, blocks, secrets, files, jobs"))
     with TestClient(main.app) as c:
         yield c
 

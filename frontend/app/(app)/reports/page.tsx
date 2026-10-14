@@ -9,6 +9,7 @@ import { BarChart } from "@/components/charts";
 import { CompareModal, RequestDocModal } from "@/components/modals";
 import { Field, ModalFoot } from "@/components/ui";
 import type { Unanswered } from "@/lib/types";
+import { QualityCard } from "./quality";
 
 type Summary = Awaited<ReturnType<typeof api.reportSummary>>;
 const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
@@ -44,6 +45,8 @@ export default function ReportsPage() {
         <div className="kpi"><span>Unanswered (open)</span><b>{openUnans}</b><small>Need a document uploaded</small></div>
         <div className="kpi"><span>Rated helpful</span><b>{helpfulPct}%</b><small>{s.feedback.length} ratings</small></div>
       </div>
+
+      <QualityCard />
 
       <div className="dgrid">
         <div className="card"><div className="card-h"><h3>Questions per week</h3><span className="xs muted">Last 8 weeks</span></div>

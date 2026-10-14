@@ -1,6 +1,5 @@
 """SVSU Knowledge Assistant API."""
 import asyncio
-import hashlib
 import json
 import re
 import uuid
@@ -8,11 +7,11 @@ from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, timedelta
 from pathlib import Path
 import pymupdf
-from fastapi import Body, Depends, FastAPI, HTTPException, Response, UploadFile
+from fastapi import Body, Form, Depends, FastAPI, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import auth, export, extract, llm, notices, policy, rag, store
+from . import auth, evaluate, export, extract, jobs, llm, notices, policy, rag, store
 from .config import settings
 
 
@@ -23,25 +22,31 @@ async def _reminder_loop():
         await asyncio.sleep(3600)
 
 
+async def _worker_loop():
+    while True:  # one background job at a time; sleeps while the queue is empty
+        try:
+            busy = await asyncio.to_thread(jobs.run_once)
+        except Exception:  # noqa: BLE001 — e.g. the database restarting; try again shortly
+            busy = False
+        if not busy:
+            await asyncio.sleep(3)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if store.is_empty():
         _seed()
-    task = asyncio.create_task(_reminder_loop()) if settings.smtp_host else None
+    jobs.requeue_stuck()
+    tasks = [asyncio.create_task(loop()) for loop, on in ((_reminder_loop, settings.smtp_host),
+                                                           (_worker_loop, settings.run_worker)) if on]
     yield
-    if task:
-        task.cancel()
+    for t in tasks:
+        t.cancel()
 
 
 app = FastAPI(title="SVSU Knowledge Assistant", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
                    allow_methods=["*"], allow_headers=["*"])
-
-_MIME = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-         ".webp": "image/webp", ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
-         ".csv": "text/csv; charset=utf-8",
-         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 Approver = Depends(auth.require_role(*policy.APPROVERS))
 Admin = Depends(auth.require_role("Administrator"))
@@ -71,7 +76,7 @@ def login(body: Login):
         raise HTTPException(401, "Wrong Login ID or password.")
     user["role"] = auth.app_role(user["login_id"])
     if rec := auth.user_record(user["login_id"]):  # shown as "Last active" in Administration
-        store.put("users", rec["id"], {**rec, "last": _stamp(datetime.now())})
+        store.put("users", rec["id"], {**rec, "last": store.stamp(datetime.now())})
     return {"token": auth.make_token(user, user["role"]), "user": user}
 
 
@@ -276,13 +281,7 @@ def extract_file(file: UploadFile, user: dict = Depends(auth.require_role(*polic
         res = extract.extract(file.filename, raw)
     except ValueError as e:
         raise HTTPException(415, str(e))
-    # Keep the original, so people can open the real document, not just the text read from it.
-    key = hashlib.sha256(raw).hexdigest()
-    mime = _MIME.get(Path(file.filename).suffix.lower(), "application/octet-stream")
-    store.put_file(key, file.filename, mime, raw)
-    res["file"] = {"key": key, "name": file.filename, "mime": mime}
-    if mime == "application/pdf":
-        res["file"]["pages"] = len(pymupdf.open(stream=raw, filetype="pdf"))
+    res["file"] = extract.keep_original(file.filename, raw)  # people can open the real document later
     lists = _setting("lists")
     res["suggestion"] = extract.suggest(res["pages"], file.filename, lists)
     res["duplicate"] = _duplicate(user, extract.text_hash(res["pages"]), res["suggestion"].get("ref", ""))
@@ -410,7 +409,7 @@ def set_openai_key(body: ApiKey, admin: dict = Admin):
         raise HTTPException(400, "That doesn't look like an OpenAI API key (they start with sk-).")
     if err := llm.check_key(key):
         raise HTTPException(400, err)
-    store.set_secret(llm.KEY_NAME, key, {"by": admin.get("name") or admin.get("login_id"), "at": _stamp(datetime.now())})
+    store.set_secret(llm.KEY_NAME, key, {"by": admin.get("name") or admin.get("login_id"), "at": store.stamp(datetime.now())})
     _audit(admin, "Changed OpenAI API key", f"key ending {key[-4:]}")
     return _key_status()
 
@@ -421,6 +420,54 @@ def remove_openai_key(admin: dict = Admin):
     store.delete_secret(llm.KEY_NAME)
     _audit(admin, "Removed OpenAI API key", "using the server's .env key")
     return _key_status()
+
+
+# ---------- bulk import ----------
+
+@app.post("/imports")
+def import_file(file: UploadFile, batch: str = Form(...), visibility: str = Form(...), publish: bool = Form(False),
+                dept: str = Form(""), user: dict = Depends(auth.require_role(*policy.UPLOADERS))):
+    """Queue one file of a bulk import; the background worker reads, describes and indexes it."""
+    if publish and user["role"] not in policy.APPROVERS:
+        raise HTTPException(403, "Only approvers can publish without review.")
+    if visibility not in _ctx().vis:
+        raise HTTPException(400, "Choose who can see these documents.")
+    if not re.fullmatch(r"[\w-]{4,64}", batch):
+        raise HTTPException(400, "Bad batch id.")
+    raw = file.file.read()
+    try:
+        extract.check_supported(file.filename)
+    except ValueError as e:
+        raise HTTPException(415, str(e))
+    info = extract.keep_original(file.filename, raw)
+    jobs.add("import", batch, {"key": info["key"], "name": file.filename, "visibility": visibility, "publish": publish,
+                               "dept": dept, "by_login": user["login_id"], "by_name": user.get("name") or user["login_id"]})
+    return {"ok": True}
+
+
+@app.get("/imports")
+def import_progress(user: dict = Depends(auth.require_role(*policy.UPLOADERS))):
+    return jobs.batches(None if user["role"] == "Administrator" else user["login_id"])
+
+
+@app.post("/imports/{batch}/retry")
+def retry_import(batch: str, user: dict = Depends(auth.require_role(*policy.UPLOADERS))):
+    return {"requeued": jobs.retry(batch, None if user["role"] == "Administrator" else user["login_id"])}
+
+
+# ---------- answer quality ----------
+
+@app.get("/reports/quality")
+def quality_report(user: dict = Approver):
+    running = [b for b in jobs.batches(None, "evaluate") if b["counts"].get("queued") or b["counts"].get("running")]
+    return {"latest": evaluate.latest(), "running": bool(running)}
+
+
+@app.post("/reports/quality/run")
+def run_quality_test(new: bool = False, admin: dict = Admin):
+    """Ask the automatic test questions again (new=true writes a fresh set first). Runs in the background."""
+    jobs.add("evaluate", "eval-" + uuid.uuid4().hex[:8], {"n": 50, "new": new, "by_login": admin["login_id"]})
+    return {"ok": True}
 
 
 @app.get("/notifications")
@@ -594,16 +641,8 @@ def _audit_action(kind: str, new: dict, old: dict | None) -> tuple[str, str] | N
     return "Edited", title
 
 
-def _stamp(t: datetime) -> str:
-    return t.strftime("%d %b %Y, %I:%M %p").lstrip("0")
-
-
 def _audit(user: dict, act: str, what: str) -> None:
-    now, entry_id = datetime.now(), uuid.uuid4().hex
-    store.put("audit", entry_id, {
-        "id": entry_id, "t": _stamp(now), "at": now.isoformat(timespec="seconds"),
-        "who": user.get("name") or user.get("login_id"), "act": act, "what": what,
-    })
+    store.audit(user.get("name") or user.get("login_id"), act, what)
 
 
 def _check_kind(kind: str) -> None:

@@ -767,3 +767,8 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 .card-b .orig-img{max-width:100%}
 .exttext-edit{font-family:var(--f-mono);font-size:13px;line-height:1.6;min-height:420px;resize:vertical;white-space:pre-wrap}
 .exttext .lowconf{text-decoration:underline wavy var(--red);text-underline-offset:3px}
+.bar-track{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin:6px 0}
+.bar-track i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .4s var(--ease)}
+.faillist{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.kpis3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.kpis3{grid-template-columns:1fr}}

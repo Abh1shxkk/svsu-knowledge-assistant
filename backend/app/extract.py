@@ -13,15 +13,28 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 
-from . import ocr
+from . import ocr, store
 from .llm import chat
 from .rag import block_text
 
 _KINDS = {".pdf": "pdf", ".docx": "docx", ".xlsx": "xlsx", ".csv": "xlsx", ".txt": "txt", ".md": "txt",
           ".png": "img", ".jpg": "img", ".jpeg": "img", ".webp": "img"}
 _PER_PAGE = 12  # paragraphs per page when the file has no pages of its own
+_MIME = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+         ".webp": "image/webp", ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
+         ".csv": "text/csv; charset=utf-8",
+         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 _MAX_OCR_PAGES = 10
 _FRAGMENT = 25  # characters: shorter paragraphs are joined to their neighbour
+
+
+def check_supported(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix not in _KINDS:
+        raise ValueError(f"{suffix or 'This'} files aren't supported. Use PDF, Word (.docx), Excel (.xlsx), "
+                         "CSV, an image or a text file.")
+    return suffix
 
 
 def extract(filename: str, raw: bytes) -> dict:
@@ -29,11 +42,8 @@ def extract(filename: str, raw: bytes) -> dict:
 
     Text is read once here; afterwards only the stored paragraphs and embeddings are used.
     """
-    suffix = Path(filename).suffix.lower()
-    kind = _KINDS.get(suffix)
-    if not kind:
-        raise ValueError(f"{suffix or 'This'} files aren't supported. Use PDF, Word (.docx), Excel (.xlsx), "
-                         "CSV, an image or a text file.")
+    suffix = check_supported(filename)
+    kind = _KINDS[suffix]
     scans: list[tuple[str, int, str, list[str]]] = []  # OCR results, one per page image
     if kind == "pdf":
         pdf = pymupdf.open(stream=raw, filetype="pdf")
@@ -97,6 +107,17 @@ def _docx(raw: bytes) -> list[str]:
         elif tag == "tbl":
             out.append(_table([c.text for c in row.cells] for row in Table(el, doc).rows))
     return out
+
+
+def keep_original(filename: str, raw: bytes) -> dict:
+    """Store the uploaded file (once per content) and return what a document records about it."""
+    key = hashlib.sha256(raw).hexdigest()
+    mime = _MIME.get(Path(filename).suffix.lower(), "application/octet-stream")
+    store.put_file(key, filename, mime, raw)
+    info = {"key": key, "name": filename, "mime": mime}
+    if mime == "application/pdf":
+        info["pages"] = len(pymupdf.open(stream=raw, filetype="pdf"))
+    return info
 
 
 def text_hash(pages: list[list[dict]]) -> str:

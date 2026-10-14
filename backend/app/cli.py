@@ -2,6 +2,9 @@
 
     python -m app.cli create-admin --login-id 636325823 --name "Abhishek Chauhan" --dept Administration
     python -m app.cli backup --to D:/backups/svsu      # a dated, compressed copy of the whole database
+    python -m app.cli import-folder /data/notices --by 636325823 --visibility "All Staff" [--publish] [--dept X]
+    python -m app.cli worker                           # process imports and tests (extra workers on a big server)
+    python -m app.cli evaluate [--new]                 # answer-quality test; prints the summary
 
 The password is typed at a hidden prompt, so it never appears on screen or in shell history.
 Restore a backup with: pg_restore --clean --dbname <DATABASE_URL> <file>
@@ -50,6 +53,26 @@ def backup(folder: str, keep: int) -> None:
     print(f"Saved {out} ({out.stat().st_size // 1024} KB)")
 
 
+def import_folder(folder: str, by: str, visibility: str, publish: bool, dept: str) -> None:
+    """Queue every supported file under a folder (files already on the server) as one batch."""
+    from . import extract, jobs
+    rec = auth.user_record(by)
+    if not rec:
+        sys.exit(f"No account with Login ID {by}.")
+    batch = "cli-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    count = 0
+    for path in sorted(Path(folder).rglob("*")):
+        try:
+            extract.check_supported(path.name)
+        except ValueError:
+            continue
+        info = extract.keep_original(path.name, path.read_bytes())
+        jobs.add("import", batch, {"key": info["key"], "name": path.name, "visibility": visibility, "publish": publish,
+                                   "dept": dept, "by_login": by, "by_name": rec.get("name") or by})
+        count += 1
+    print(f"Queued {count} files as batch {batch}. Progress: Upload Documents → Bulk import.")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="python -m app.cli")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -61,11 +84,30 @@ def main() -> None:
     b = sub.add_parser("backup", help="save a copy of the database (run daily from Task Scheduler or cron)")
     b.add_argument("--to", default="D:/backups/svsu")
     b.add_argument("--keep", type=int, default=30, help="how many backups to keep")
+    i = sub.add_parser("import-folder", help="queue every file in a folder for bulk import")
+    i.add_argument("folder")
+    i.add_argument("--by", required=True, help="Login ID recorded as the uploader")
+    i.add_argument("--visibility", default="All Staff")
+    i.add_argument("--publish", action="store_true", help="publish without review")
+    i.add_argument("--dept", default="")
+    sub.add_parser("worker", help="process queued imports and tests until stopped")
+    e = sub.add_parser("evaluate", help="run the answer-quality test now")
+    e.add_argument("--new", action="store_true", help="write a fresh question set first")
+    e.add_argument("-n", type=int, default=50)
     args = p.parse_args()
     if args.cmd == "create-admin":
         create_admin(args.login_id.strip(), args.name, args.email, args.dept)
     elif args.cmd == "backup":
         backup(args.to, args.keep)
+    elif args.cmd == "import-folder":
+        import_folder(args.folder, args.by, args.visibility, args.publish, args.dept)
+    elif args.cmd == "worker":
+        from . import jobs
+        jobs.requeue_stuck()
+        jobs.work_forever()
+    elif args.cmd == "evaluate":
+        from . import evaluate
+        print(evaluate.run(args.n, args.new))
 
 
 if __name__ == "__main__":

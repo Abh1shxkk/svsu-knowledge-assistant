@@ -332,3 +332,38 @@ def test_corrected_text_must_be_well_formed(client, people):
         assert put(client, up, "documents", doc("BAD1", pages=bad)).status_code == 400, bad
     fixed = [[{"id": "b1", "text": "Corrected OCR text.", "kind": "p"}]]
     assert put(client, up, "documents", doc("BAD1", pages=fixed)).status_code == 200
+
+
+def test_bulk_import_queues_processes_and_reports(client, people):
+    from app import jobs
+    up, ap = people["Uploader"], people["Approver"]
+    form = {"batch": "batch-1", "visibility": "All Staff", "publish": "false"}
+    txt = ("notice.txt", io.BytesIO(b"Hostel gates close at 10 PM for all resident students from November."), "text/plain")
+    assert client.post("/imports", headers=up, data={**form, "publish": "true"}, files={"file": txt}).status_code == 403
+    assert client.post("/imports", headers=up, data=form, files={"file": ("x.doc", io.BytesIO(b"x"))}).status_code == 415
+    txt[1].seek(0)
+    assert client.post("/imports", headers=up, data=form, files={"file": txt}).status_code == 200
+    again = ("copy.txt", io.BytesIO(b"Hostel gates close at 10 PM for all resident students from November."), "text/plain")
+    assert client.post("/imports", headers=up, data=form, files={"file": again}).status_code == 200
+    assert client.post("/imports", headers=up, data=form, files={"file": ("blank.txt", io.BytesIO(b"   "), "text/plain")}).status_code == 200
+    while jobs.run_once():
+        pass
+    [b] = [b for b in client.get("/imports", headers=up).json() if b["batch"] == "batch-1"]
+    assert b["counts"] == {"done": 1, "duplicate": 1, "failed": 1}
+    assert "No text" in b["failed"][0]["error"]
+    mine = [d for d in client.get("/records", headers=up).json()["documents"] if (d.get("file") or {}).get("name") == "notice.txt"]
+    assert mine and mine[0]["status"] == "Pending" and mine[0]["uploader_id"] == "t-uploader"
+    assert client.get("/imports", headers=ap).json() == [] or all(x["batch"] != "batch-1" for x in client.get("/imports", headers=ap).json())
+    assert client.post("/imports/batch-1/retry", headers=up).json() == {"requeued": 1}
+
+
+def test_quality_report_from_generated_questions(client, people, admin):
+    from app import evaluate
+    ap = people["Approver"]
+    page = [[{"id": "b1", "text": "Every regular employee is entitled to twelve days of casual leave in a calendar year.", "kind": "p"}]]
+    assert put(client, ap, "documents", doc("QT1", status="Active", pages=page)).status_code == 200
+    summary = evaluate.run(n=3, new=True)
+    assert summary["questions"] >= 1 and 0 <= summary["answered_correctly"] <= 100
+    assert client.get("/reports/quality", headers=ap).json()["latest"]["id"] == summary["id"]
+    assert client.post("/reports/quality/run", headers=ap).status_code == 403   # administrators start a run
+    assert client.post("/reports/quality/run", headers=admin).status_code == 200

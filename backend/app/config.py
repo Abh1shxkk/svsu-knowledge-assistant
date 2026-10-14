@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"  # the web app's address(es), comma-separated
 
     # Deadline reminder emails. Leave SMTP_HOST blank to show reminders in the app only.
+    # Run the background worker (bulk imports, quality tests) inside the API. Turn off when separate
+    # workers run with `python -m app.cli worker`.
+    run_worker: bool = True
+
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""

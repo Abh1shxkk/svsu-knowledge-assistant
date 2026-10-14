@@ -6,8 +6,9 @@ import { api, type Extracted } from "@/lib/api";
 import { canApprove, lists, me, useStore } from "@/lib/store";
 import { blockText, isHindi, nid, todayIso } from "@/lib/util";
 import { Icon } from "@/components/icon";
-import { Ft, Field } from "@/components/ui";
+import { Ft, Field, Tabs } from "@/components/ui";
 import { TextReview } from "@/components/text-review";
+import { BulkImport } from "./bulk";
 import type { Block, Doc, FileKind } from "@/lib/types";
 
 type Meta = Partial<Pick<Doc, "title" | "ref" | "type" | "authority" | "dept" | "institution" | "date" | "effective" | "expiry" | "audience" | "tags" | "visibility" | "description" | "related">>
@@ -31,6 +32,7 @@ export default function UploadPage() {
   const [queue, setQueue] = useState<Item[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const [over, setOver] = useState(false);
+  const [mode, setMode] = useState("one");
   const fileRef = useRef<HTMLInputElement>(null);
   const sel = queue.find((q) => q.id === selId);
   const active = s.documents.filter((d) => d.status === "Active");
@@ -100,6 +102,8 @@ export default function UploadPage() {
     <div className="wrap">
       <div className="pagehead"><div><h2>Upload documents</h2><p>Add official letters, notices, circulars and policies. Files are read, tagged and sent for approval before the assistant can use them.</p></div>
         {canApprove(s) && <Link className="btn" href="/review"><Icon n="shield" s /> Review queue</Link>}</div>
+      <Tabs active={mode} onChange={setMode} tabs={[["one", "One by one"], ["bulk", "Bulk import"]]} />
+      {mode === "bulk" ? <BulkImport /> : (
 
       <div className="upgrid">
         <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
@@ -216,6 +220,7 @@ export default function UploadPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
