@@ -50,6 +50,8 @@ def send_due_reminders() -> int:
         return 0
     today, sent = date.today().isoformat(), 0
     deadlines = {x["id"]: x for x in store.list_of("deadlines")}
+    docs = {d["id"]: d for d in store.list_of("documents")}
+    ctx = policy.Ctx.from_settings(store.list_of("settings"))
     for rem in store.list_of("reminders"):
         x = deadlines.get(rem.get("deadline"))
         if not x or x.get("done") or rem.get("sent") == today or "Email" not in rem.get("via", []):
@@ -58,6 +60,9 @@ def send_due_reminders() -> int:
             continue
         rec = auth.user_record(rem.get("owner", ""))
         if not rec or not rec.get("email") or rec.get("active") is False:
+            continue
+        doc = docs.get(x.get("doc"))
+        if not doc or not policy.can_view(auth._profile(rem["owner"], rec), doc, ctx):  # lost access since
             continue
         msg = EmailMessage()
         msg["From"], msg["To"] = settings.smtp_from or settings.smtp_user, rec["email"]

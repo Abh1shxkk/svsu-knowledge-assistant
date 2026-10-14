@@ -1,5 +1,5 @@
 """The app's data in PostgreSQL: JSON records grouped by kind, plus password hashes."""
-from sqlalchemy import Column, Integer, String, Table, UniqueConstraint, case, cast, select, Text
+from sqlalchemy import Column, Integer, String, Table, UniqueConstraint, case, cast, func, literal_column, select, Text
 from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from .database import engine, meta
@@ -53,7 +53,11 @@ def list_of(kind: str) -> list[dict]:
 def search_documents(text: str) -> list[dict]:
     """Documents whose details or text contain `text` (any case), without their text."""
     like = "%" + text.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
-    q = select(_light).where(records.c.kind == "documents", cast(records.c.data, Text).ilike(like))
+    d = records.c.data  # the details people see and the paragraph text, not field names or workflow notes
+    words = func.concat_ws(" ", *(d[k].astext for k in ("title", "ref", "description", "dept", "type", "authority")),
+                           cast(d["tags"], Text),
+                           cast(func.jsonb_path_query_array(d["pages"], literal_column("'$[*][*].text'::jsonpath")), Text))
+    q = select(_light).where(records.c.kind == "documents", words.ilike(like))
     with engine.connect() as c:
         return list(c.scalars(q))
 

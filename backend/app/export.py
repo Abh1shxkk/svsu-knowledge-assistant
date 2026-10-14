@@ -6,8 +6,8 @@ from datetime import date
 from docx import Document
 
 
-def _clean(text: str) -> str:
-    return re.sub(r"\{(\d+)\}", r"[\1]", text.replace("**", ""))
+def _clean(text) -> str:  # table cells from the model may be numbers
+    return re.sub(r"\{(\d+)\}", r"[\1]", str(text).replace("**", ""))
 
 
 def answers_docx(title: str, items: list[dict], docs: dict) -> bytes:
@@ -31,7 +31,7 @@ def answers_docx(title: str, items: list[dict], docs: dict) -> bytes:
                 table = out.add_table(rows=1, cols=len(t["head"]))
                 table.style = "Table Grid"
                 for cell, text in zip(table.rows[0].cells, t["head"]):
-                    cell.text = text
+                    cell.text = _clean(text)
                 for row in t["rows"]:
                     for cell, text in zip(table.add_row().cells, row):
                         cell.text = _clean(text)

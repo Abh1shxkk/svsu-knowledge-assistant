@@ -99,7 +99,8 @@ def write_error(user: dict, kind: str, new: dict | None, old: dict | None, ctx: 
             # Uploaders only work on their own unpublished documents, and can only save or submit them.
             if old is not None and (old.get("uploader_id") != me or old.get("status") not in EDITABLE):
                 return "Only approvers can change a published document."
-            if new.get("status") not in ("Draft", "Pending"):
+            unchanged = old is not None and new.get("status") == old.get("status")
+            if new.get("status") not in ("Draft", "Pending") and not unchanged:
                 return "Only approvers can publish, reject or withdraw documents."
         return None
     if kind == "deadlines":

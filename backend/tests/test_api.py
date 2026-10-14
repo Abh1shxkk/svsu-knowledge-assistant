@@ -154,3 +154,49 @@ def test_openai_key_is_admin_only_and_never_returned(client, people, admin, monk
     leaked = client.get("/records", headers=admin).text + client.get("/admin/openai-key", headers=admin).text
     assert key not in leaked
     assert client.delete("/admin/openai-key", headers=admin).json()["source"] != "admin"
+
+
+def test_uploader_can_edit_after_changes_requested(client, people):
+    up, ap = people["Uploader"], people["Approver"]
+    assert put(client, up, "documents", doc("CR1")).status_code == 200
+    assert put(client, ap, "documents", doc("CR1", status="Changes requested")).status_code == 200
+    # Editing keeps the status; access can change too; then they resubmit.
+    assert put(client, up, "documents", doc("CR1", status="Changes requested", title="Fixed")).status_code == 200
+    assert put(client, up, "documents", doc("CR1", status="Changes requested", visibility="Public (students & staff)")).status_code == 200
+    assert put(client, up, "documents", doc("CR1", status="Pending")).status_code == 200
+    assert put(client, up, "documents", doc("CR1", status="Active")).status_code == 403
+
+
+def test_collection_keeps_documents_its_editor_cannot_see(client, people, admin):
+    v, ap = people["Viewer"], people["Approver"]
+    for i in ("K1", "K2"):
+        assert put(client, ap, "documents", doc(i, status="Active")).status_code == 200
+    assert put(client, v, "collections", {"id": "coK", "name": "c", "docs": ["K1", "K2"]}).status_code == 200
+    assert put(client, ap, "documents", doc("K2", status="Active", visibility="Management Only")).status_code == 200
+    mine = next(c for c in client.get("/records", headers=v).json()["collections"] if c["id"] == "coK")
+    assert mine["docs"] == ["K1"]
+    assert put(client, v, "collections", {**mine, "name": "renamed"}).status_code == 200
+    full = next(c for c in client.get("/records", headers=admin).json()["collections"] if c["id"] == "coK")
+    assert full["docs"] == ["K1", "K2"]
+
+
+def test_export_handles_number_cells(client, people):
+    answer = {"body": [{"table": {"head": ["Leave", 1], "rows": [["CL", 12]]}}], "cites": []}
+    r = client.post("/export/docx", headers=people["Viewer"], json={"title": "t", "items": [{"q": "q", "answer": answer}]})
+    assert r.status_code == 200
+
+
+def test_search_matches_content_not_field_names(client, people):
+    v = people["Viewer"]
+    for word in ("status", "uploader_id", "Original upload", "kind"):
+        assert client.get("/search", params={"q": word}, headers=v).json() == [], word
+    assert "F1" in client.get("/search", params={"q": "casual leave"}, headers=v).json()
+
+
+def test_deadlines_and_reminders_need_access_to_the_document(client, people):
+    ap, up, v = people["Approver"], people["Uploader"], people["Viewer"]
+    assert put(client, ap, "documents", doc("MO1", status="Active", visibility="Management Only")).status_code == 200
+    assert put(client, ap, "deadlines", {"id": "dlMO", "doc": "MO1", "date": "2099-01-01", "title": "secret"}).status_code == 200
+    assert put(client, up, "deadlines", {"id": "dlMO", "doc": "MO1", "date": "2099-01-01", "title": "tampered"}).status_code == 404
+    assert client.delete("/records/deadlines/dlMO", headers=up).status_code == 404
+    assert put(client, v, "reminders", {"id": "rmMO", "deadline": "dlMO", "days": 1, "via": ["Email"]}).status_code == 404

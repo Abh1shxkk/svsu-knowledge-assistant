@@ -182,6 +182,18 @@ def put_record(kind: str, id: str, data: dict = Body(...), user: dict = Depends(
         data["owner"] = (old or {}).get("owner") or user["login_id"]
     if kind == "users":
         _check_user_change(user, data, old)
+    if kind == "deadlines":  # only for documents this person can see, before and after
+        for doc_id in {(old or {}).get("doc"), data.get("doc")} - {None}:
+            _visible_doc(user, doc_id)
+    if kind == "reminders":
+        dl = store.get("deadlines", data.get("deadline", ""))
+        if not dl:
+            raise HTTPException(404, "Deadline not found")
+        _visible_doc(user, dl.get("doc", ""))
+    if kind == "collections" and old:  # keep documents this person can't see; they were filtered out of their copy
+        ctx = _ctx()
+        hidden = [i for i in old.get("docs", []) if (d := store.get("documents", i)) and not policy.can_view(user, d, ctx)]
+        data["docs"] = list(dict.fromkeys([*data.get("docs", []), *hidden]))
     if kind == "documents":
         data["uploader_id"] = old.get("uploader_id") if old else user["login_id"]
         if old and "pages" not in data:  # metadata edits from lists that don't carry the text
@@ -203,6 +215,8 @@ def delete_record(kind: str, id: str, user: dict = Depends(auth.current_user)):
         raise HTTPException(404, "Not found")
     if err := policy.write_error(user, kind, None, old, _ctx()):
         raise HTTPException(403, err)
+    if kind == "deadlines" and old.get("doc"):
+        _visible_doc(user, old["doc"])
     if kind == "users":
         _check_user_change(user, None, old)
         if old.get("login_id"):
