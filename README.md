@@ -10,6 +10,9 @@ don't say something, it says so instead of guessing.
 
 **Live (test deployment, staff login required):** https://svsu.54-173-64-109.sslip.io
 
+**📱 Android app:** [download the latest version](https://github.com/Abh1shxkk/svsu-knowledge-assistant/releases/latest)
+(free, same account as the website). See [Android app](#android-app) below.
+
 ![Asking a question: the answer cites the date sheet, and the source opens at the cited row](docs/screenshots/source-viewer.png)
 
 ## What it does
@@ -48,6 +51,25 @@ don't say something, it says so instead of guessing.
 | **Bulk import:** a background queue with progress | **Administration:** roles, two-step verification, lock-out |
 | ![Sign in](docs/screenshots/login.png) | ![Dark mode](docs/screenshots/dashboard-dark.png) |
 | **Sign in** | **Dark mode** |
+
+## Android app
+
+Everything on the website is also in an Android app, built with Flutter. It uses the same server and
+the same accounts, so each person sees exactly what their role allows on the web.
+
+| | | | |
+|---|---|---|---|
+| ![Dashboard in dark mode](docs/screenshots/android-dashboard.png) | ![An answer with numbered sources](docs/screenshots/android-answer.png) | ![The cited passage, highlighted in the Hindi circular](docs/screenshots/android-citation.png) | ![Document library](docs/screenshots/android-library.png) |
+| **Dashboard** (dark mode) | **Answer** with sources | **Cited passage** highlighted | **Library** |
+
+**Install:** open the [latest release](https://github.com/Abh1shxkk/svsu-knowledge-assistant/releases/latest)
+on an Android phone and download **SVSU-Assistant-…-arm64.apk** (or the *universal* file if that one
+won't install). Open it, allow "install unknown apps" when Android asks, and sign in with your website
+Login ID and password. The app says when a newer version is available.
+
+Made for phones: long-press a paragraph to bookmark it, photograph a paper letter to upload it (read with
+OCR), and open originals and Word exports in the phone's own apps. Details, building and publishing are in
+[mobile/README.md](mobile/README.md).
 
 ## How it works
 
@@ -91,12 +113,13 @@ checks the result.
 | Layer | Tools |
 |---|---|
 | Frontend | Next.js 16, React 19, TypeScript, Zustand, plain CSS with light and dark themes |
+| Android app | Flutter 3.47 (Dart), go_router, streamed answers over the same API, token in secure storage |
 | Backend | Python 3.11, FastAPI, SQLAlchemy, server-sent events for streaming |
 | Data | PostgreSQL 16 with pgvector (HNSW cosine index), JSONB records |
 | AI | OpenAI `gpt-4o` (answers), `gpt-4o-mini` (query rewrite, re-ranking, fact check, test judge), `text-embedding-3-small` |
 | OCR and files | Tesseract (`eng`, `hin`, `osd`), PyMuPDF, python-docx, openpyxl, NumPy |
 | Security | bcrypt passwords, JWT sessions, TOTP two-step verification (pyotp), role and visibility policy on every request |
-| Testing | pytest (65 API tests on a separate database, OpenAI stubbed), Playwright (12 browser tests against the live site) |
+| Testing | pytest (65 API tests on a separate database, OpenAI stubbed), Playwright (12 browser tests against the live site), Flutter widget tests (every app screen, on a phone-sized screen) |
 | Hosting | AWS EC2 (Ubuntu), Docker Compose, Caddy (automatic HTTPS), GitHub Actions |
 
 ## Deployment and CI/CD
@@ -105,6 +128,7 @@ checks the result.
 flowchart LR
   P[git push to main] --> T1[Backend job:<br/>pytest on PostgreSQL]
   P --> T2[Frontend job:<br/>tsc, eslint, next build]
+  P --> T3[Mobile job:<br/>flutter analyze, flutter test]
   T1 --> D[Deploy job]
   T2 --> D
   D --> B[Build the website on the runner]
@@ -117,8 +141,8 @@ flowchart LR
   the FastAPI API (Tesseract installed in the image) and the Next.js standalone server on Node 22. Each has
   a memory limit. Containers only listen on `127.0.0.1`, and **Caddy** serves them over HTTPS (`/api/*` →
   API, everything else → website).
-- **Pipeline** (`.github/workflows/ci.yml`): every push runs the backend tests and the frontend type check,
-  lint and production build. On `main`, the deploy job:
+- **Pipeline** (`.github/workflows/ci.yml`): every push runs the backend tests, the frontend type check,
+  lint and production build, and the Android app's analyzer and tests (the app job doesn't hold up a deploy). On `main`, the deploy job:
   1. builds the website on the GitHub runner, so the small server doesn't have to;
   2. copies it over SSH;
   3. checks out the exact commit on the server and rebuilds the containers;
@@ -168,6 +192,7 @@ npm run dev                     # http://localhost:3000
 cd backend && python -m pytest -q                   # 65 API tests, offline, on database svsu_test
 cd frontend && npx playwright test                  # browser tests; needs E2E_BASE_URL, E2E_API_URL,
                                                     # E2E_ADMIN_ID, E2E_ADMIN_PASS
+cd mobile && flutter test                           # Android app: every screen against backend/seed.json
 ```
 
 ## Project docs
@@ -176,3 +201,4 @@ cd frontend && npx playwright test                  # browser tests; needs E2E_B
   from real circulars.
 - [docs/FIXES.md](docs/FIXES.md): the security and correctness review and what was fixed.
 - [deploy/README.md](deploy/README.md): server set-up, manual deploy, rollback, database tunnel.
+- [mobile/README.md](mobile/README.md): the Android app: install, build, publish a new version, signing key.
