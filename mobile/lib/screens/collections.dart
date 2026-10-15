@@ -228,7 +228,8 @@ class _CollectionDetailScreenState extends State<CollectionDetailScreen> with St
         ],
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 4, 14, 40), children: gap([
-        if (co.desc.isNotEmpty || co.ownerName.isNotEmpty) Text('${co.desc}${co.ownerName.isNotEmpty ? ' · by ${co.ownerName}' : ''}', style: muted(context)),
+        if (co.desc.isNotEmpty || co.ownerName.isNotEmpty)
+          Text([if (co.desc.isNotEmpty) co.desc, if (co.ownerName.isNotEmpty) 'by ${co.ownerName}'].join(' · '), style: muted(context)),
         btn('Ask this collection', () => context.go('/ask?group=${Uri.encodeComponent('coll:${co.id}')}'), icon: Icons.auto_awesome, primary: true, small: false),
         Section(
           children: ds.isEmpty
