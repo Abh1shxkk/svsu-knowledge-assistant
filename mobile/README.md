@@ -36,9 +36,37 @@ flutter run                  # on a connected phone or an emulator
 flutter build apk --release  # build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Release builds are currently signed with the debug key, which is fine for installing directly on
-phones. To publish on Google Play, create an upload key and set `signingConfig` in
-`android/app/build.gradle.kts`.
+## Install (for staff)
+
+Download the APK from the latest **android-v…** release on
+[GitHub Releases](https://github.com/Abh1shxkk/svsu-knowledge-assistant/releases), open it on the phone and
+allow "install unknown apps" when Android asks. Most phones from the last 8 years need the **arm64** file;
+if it won't install, use the **universal** one. Sign in with the Login ID and password from your administrator.
+
+When a newer version is published, the app says so on start and offers a download link.
+
+## Publish a new version
+
+1. Raise `version:` in `pubspec.yaml` (e.g. `1.0.0+1` → `1.1.0+2`; the number after `+` must always go up).
+2. Build, with the release key in place (below):
+   ```bash
+   flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64 -P force-version-code-ignoring-abi=true
+   flutter build apk --release -P force-version-code-ignoring-abi=true
+   ```
+   `force-version-code-ignoring-abi` keeps one version number for every APK, so a phone can switch
+   between the arm64 and universal files and still update.
+3. Create a GitHub release tagged `android-v1.1.0` and attach the three APKs from
+   `build/app/outputs/flutter-apk/`. Installed apps find it by the `android-v` prefix.
+
+## Release signing key
+
+Android only installs an update if it is signed with the same key as the installed app. The key is
+**not** in this repository:
+
+- `D:\svsu-signing\svsu-release.jks`, with its password in `README.txt` next to it. Back this folder up
+  somewhere safe. If it is lost, every phone has to uninstall and reinstall to get a new version.
+- `android/key.properties` (ignored by git) points the build at it. Without that file, release builds
+  are signed with the debug key, which is fine for CI and testing but not for giving to people.
 
 ## Layout
 

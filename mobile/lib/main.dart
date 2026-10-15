@@ -18,6 +18,7 @@ import 'screens/saved.dart';
 import 'screens/upload.dart';
 import 'store.dart';
 import 'theme.dart';
+import 'update.dart';
 import 'widgets/shell.dart';
 import 'widgets/ui.dart';
 
@@ -129,7 +130,12 @@ class _GateState extends State<Gate> with StoreListener {
 
   @override
   Widget build(BuildContext context) {
-    if (store.loaded) return widget.child;
+    if (store.loaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) checkForUpdate(context);
+      });
+      return widget.child;
+    }
     final err = store.error;
     return Scaffold(
       body: Center(
