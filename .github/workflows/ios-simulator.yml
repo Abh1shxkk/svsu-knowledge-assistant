@@ -1,0 +1,52 @@
+name: iOS simulator build
+
+# Builds the app for the iPhone simulator on a GitHub Mac, so it can be tried without a Mac or an Apple
+# account: download the artifact and upload the .zip to appetize.io, which runs it in the browser.
+# Simulator builds aren't signed and can't be installed on a real iPhone.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/ios-simulator.yml"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.7", channel: stable, cache: true }
+      - run: flutter pub get
+
+      # For this Mac's own chip; also prepares the Xcode project for the step below.
+      - run: flutter build ios --simulator --debug --no-codesign
+
+      # Both Apple-chip and Intel simulators, so it runs wherever the app is uploaded.
+      - name: Build for both simulator types
+        id: universal
+        continue-on-error: true
+        working-directory: mobile/ios
+        run: |
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ../build/ios_universal \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO build
+
+      - name: Package the app
+        run: |
+          APP=build/ios_universal/Build/Products/Debug-iphonesimulator/Runner.app
+          if [ "${{ steps.universal.outcome }}" != "success" ] || [ ! -d "$APP" ]; then
+            echo "::warning::Universal build failed; packaging the build for this Mac's chip only."
+            APP=build/ios/iphonesimulator/Runner.app
+          fi
+          echo "Architectures:"; lipo -info "$APP/Runner"
+          mkdir -p out && ditto -c -k --sequesterRsrc --keepParent "$APP" out/SVSU-Assistant-ios-simulator.zip
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SVSU-Assistant-ios-simulator
+          path: mobile/out/SVSU-Assistant-ios-simulator.zip
+          retention-days: 30
