@@ -29,6 +29,19 @@ jobs:
       - run: npx eslint app components lib
       - run: npx next build
 
+  # The Android app: analyzer, and widget tests that open every screen against backend/seed.json.
+  # Not needed for the deploy below, which only ships the backend and website.
+  mobile:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.7", channel: stable, cache: true }
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
   # Every push to main that passes the checks above goes to the test server (deploy/README.md).
   deploy:
     needs: [backend, frontend]
