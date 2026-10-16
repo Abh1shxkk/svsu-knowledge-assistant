@@ -41,13 +41,13 @@ class _ViewerPageState extends State<ViewerPage> {
   List<GlobalKey> pageKeys = [];
   final scroll = ScrollController();
   String? _scrolledFor;
+  final origKey = GlobalKey();
+  bool? onPage; // the cited passage found on the original page? null while looking
 
   @override
   void initState() {
     super.initState();
     store.addListener(_changed);
-    // Citations point at a passage: the text view shows it highlighted.
-    if (v.block != null) view = 'text';
   }
 
   @override
@@ -96,7 +96,10 @@ class _ViewerPageState extends State<ViewerPage> {
       final i = v.idx + d;
       if (i < 0 || i >= cites.length) return;
       final c = cites[i];
-      setState(() => v = ViewerArgs(doc: c.doc, page: c.page, block: c.block, quote: c.quote, cites: cites, idx: i));
+      setState(() {
+        v = ViewerArgs(doc: c.doc, page: c.page, block: c.block, quote: c.quote, cites: cites, idx: i);
+        onPage = null;
+      });
     }
 
     void goPage(int d) {
@@ -206,7 +209,20 @@ class _ViewerPageState extends State<ViewerPage> {
           child: showOriginal
               ? InteractiveViewer(
                   maxScale: 4,
-                  child: ListView(padding: const EdgeInsets.all(12), children: [OriginalFile(doc: doc, page: v.page.clamp(1, pageCount))]),
+                  child: ListView(padding: const EdgeInsets.all(12), children: [
+                    OriginalFile(
+                      key: ValueKey('${doc.id}:${v.page}:${v.idx}'),
+                      doc: doc,
+                      page: v.page.clamp(1, pageCount),
+                      quote: hl != null && (cur == null || cur.page == v.page) ? _quoteOf(doc, hl) : null,
+                      hlKey: origKey,
+                      onFound: (found) {
+                        if (onPage != found && mounted) setState(() => onPage = found);
+                        final ctx = origKey.currentContext;
+                        if (found && ctx != null) Scrollable.ensureVisible(ctx, alignment: .3, duration: const Duration(milliseconds: 350));
+                      },
+                    ),
+                  ]),
                 )
               : SingleChildScrollView(
                   controller: scroll,
@@ -237,7 +253,9 @@ class _ViewerPageState extends State<ViewerPage> {
             top: false,
             child: Text(
               showOriginal
-                  ? 'The original file as uploaded${hl != null ? ', at page ${v.page}. Use Text to see the cited passage highlighted.' : '.'}'
+                  ? hl != null && onPage == true
+                      ? 'The cited passage is highlighted on the original page ${v.page}. Text shows the exact words read from it.'
+                      : 'The original file as uploaded${hl != null ? ', at page ${v.page}. Use Text to see the cited passage highlighted.' : '.'}'
                   : hl != null
                       ? 'Highlighted text is the exact passage cited. Page ${v.page}. Long-press a paragraph to bookmark it.'
                       : 'The text read from the document${doc.fileType == 'scan' ? ' by OCR — check figures against the original' : ''}. Long-press a paragraph to bookmark it.',
@@ -248,4 +266,11 @@ class _ViewerPageState extends State<ViewerPage> {
       ]),
     );
   }
+}
+
+/// The words to find on the original page: the quote, or the whole cited paragraph when there is none.
+String _quoteOf(Doc doc, Highlight hl) {
+  if (hl.quote.isNotEmpty) return hl.quote;
+  if (hl.page < 1 || hl.page > doc.pages.length) return '';
+  return doc.pages[hl.page - 1].where((b) => b.id == hl.block).firstOrNull?.plain ?? '';
 }

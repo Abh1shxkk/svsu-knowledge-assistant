@@ -502,3 +502,49 @@ def test_required_two_step_is_set_up_during_sign_in(client, admin, people):
     finally:
         put(client, admin, "settings", {"id": "security", "requireMfa": False})
         client.delete("/accounts/t-approver/mfa", headers=admin)
+
+
+def test_cited_passage_is_located_on_the_original_pdf_page(client, people, admin):
+    import pymupdf
+    from app import store
+    up, v = people["Uploader"], people["Viewer"]
+    pdf = pymupdf.open()
+    page = pdf.new_page()  # 595 x 842 points
+    page.insert_text((72, 100), "Subject: Revised timings for the university hostels.")
+    page.insert_text((72, 300), "All students must return to the hostel by 9:00 PM on working days.")
+    page.insert_text((72, 316), "Late entry needs written permission from the warden in advance.")
+    page.insert_text((72, 600), "Copy to: All Heads of Institutions and notice boards.")
+    ex = client.post("/extract", headers=up, files={"file": ("h.pdf", io.BytesIO(pdf.tobytes()), "application/pdf")}).json()
+    assert put(client, up, "documents", doc("HL1", status="Pending", file=ex["file"])).status_code == 200
+    url = "/documents/HL1/file/page/1/highlight"
+
+    quote = "students must return to the hostel by 9:00 PM on working days. Late entry needs written permission"
+    rects = client.get(url, headers=up, params={"q": quote}).json()["rects"]
+    assert len(rects) == 2                                       # one box per line of the passage
+    assert all(0.33 < r[1] < 0.39 and r[0] < 0.2 for r in rects)  # where it was written (y 300-316 of 842)
+    assert rects[0][1] < rects[1][1]
+
+    # A misread word or two still finds the passage; an unrelated quote finds nothing.
+    assert client.get(url, headers=up, params={"q": "students must retum to the hoste1 by 9:00 PM"}).json()["rects"]
+    assert client.get(url, headers=up, params={"q": "The examination fee is due on the first of March"}).json()["rects"] == []
+    assert client.get("/documents/HL1/file/page/2/highlight", headers=up, params={"q": quote}).status_code == 404
+    assert client.get(url, headers=v, params={"q": quote}).status_code == 404   # not published: not theirs to see
+
+    from app import locate
+    assert store.has_file(locate.words_key(ex["file"]["key"], 1))  # positions are kept, not worked out each time
+    assert client.delete("/records/documents/HL1", headers=admin).status_code == 200
+    assert not store.has_file(locate.words_key(ex["file"]["key"], 1))  # and removed with the document
+
+
+def test_quotes_match_ocr_words_loosely():
+    from app import locate
+    # OCR output for two lines, with a misread ("retum") and punctuation stuck to words.
+    line1 = ["All", "students", "must", "retum", "to", "the", "hostel,"]
+    line2 = ["by", "9:00", "PM", "on", "working", "days."]
+    words = [(t, 0.1 + i * 0.1, 0.30, 0.18 + i * 0.1, 0.32) for i, t in enumerate(line1)]
+    words += [(t, 0.1 + i * 0.1, 0.34, 0.18 + i * 0.1, 0.36) for i, t in enumerate(line2)]
+    words += [("students", 0.1, 0.8, 0.2, 0.82), ("hostel", 0.3, 0.8, 0.4, 0.82)]  # the same words, far away
+    rects = locate.match(words, "students must return to the hostel by 9:00 PM on working days")
+    assert len(rects) == 2 and all(r[3] < 0.4 for r in rects)  # the two lines, not the stray words below
+    assert locate.match(words, "fee payment schedule for March") == []
+    assert locate.match([("परीक्षा", .1, .1, .2, .12), ("ड्यूटी", .21, .1, .3, .12), ("समय", .31, .1, .4, .12)], "परीक्षा ड्यूटी का समय")

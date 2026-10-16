@@ -762,13 +762,18 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 @media (hover:none){.hrow .del{opacity:.6}}
 /* The original uploaded file */
 .orig-img{max-width:none;height:auto;background:#fff;box-shadow:var(--shadow);border-radius:4px;flex:none}
+/* The page picture, with the cited passage marked over it like a highlighter pen. */
+.orig-wrap{position:relative;flex:none;max-width:none}
+.orig-wrap .orig-img{display:block;width:100%}
+.orig-hl{position:absolute;background:#fbe3a1;mix-blend-mode:multiply;border-radius:2px;box-shadow:0 0 0 1px #c08a12;pointer-events:none}
+.orig-hl.pulse{animation:pulse 1.6s ease-out 1}
 .orig-wait{min-height:50vh;display:grid;place-items:center}
 .cstep .q .link{display:block;margin-top:4px}
 /* Phones: the document viewer covers the screen (overrides the desktop panel rule above). */
 @media (max-width:860px){
   .viewer{position:fixed;inset:0;width:100%;max-width:none;border-radius:0;border:0;z-index:80}
 }
-.card-b .orig-img{max-width:100%}
+.card-b .orig-img,.card-b .orig-wrap{max-width:100%}
 .exttext-edit{font-family:var(--f-mono);font-size:13px;line-height:1.6;min-height:420px;resize:vertical;white-space:pre-wrap}
 .exttext .lowconf{text-decoration:underline wavy var(--red);text-underline-offset:3px}
 .bar-track{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin:6px 0}

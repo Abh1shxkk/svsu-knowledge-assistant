@@ -145,8 +145,9 @@ def has_file(key: str) -> bool:
 
 
 def delete_file(key: str) -> None:
+    """The file and anything kept alongside it (word positions, stored as "<start of key>.w<page>")."""
     with engine.begin() as c:
-        c.execute(files.delete().where(files.c.key == key))
+        c.execute(files.delete().where((files.c.key == key) | files.c.key.like(key[:56] + ".%")))
 
 
 def stamp(t: datetime) -> str:

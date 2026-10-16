@@ -105,6 +105,9 @@ export const api = {
   document: (id: string) => call<Doc>(`/documents/${encodeURIComponent(id)}`),
   originalFile: (id: string) => call<Blob>(`/documents/${encodeURIComponent(id)}/file`),
   originalPage: (id: string, n: number) => call<Blob>(`/documents/${encodeURIComponent(id)}/file/page/${n}`),
+  /** Where a quote sits on page n of the original: boxes [x0, y0, x1, y1] as fractions of the page. */
+  pageHighlight: (id: string, n: number, q: string) =>
+    call<{ rects: number[][] }>(`/documents/${encodeURIComponent(id)}/file/page/${n}/highlight?q=${encodeURIComponent(q.slice(0, 1500))}`),
   search: (q: string) => call<string[]>(`/search?q=${encodeURIComponent(q)}`),
   checks: (id: string) => call<[string, string][]>(`/documents/${encodeURIComponent(id)}/checks`),
   notifications: () => call<Notice[]>("/notifications"),

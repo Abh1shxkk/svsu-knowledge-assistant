@@ -8,6 +8,7 @@ import { Icon } from "./icon";
 import { DownloadOriginal, OriginalFile, originalPages, previewable } from "./original";
 import { Pages } from "./paper";
 import { Pill } from "./ui";
+import type { Doc } from "@/lib/types";
 
 export function Viewer() {
   const v = useStore((s) => s.viewer);
@@ -16,6 +17,7 @@ export function Viewer() {
   const { closeViewer, openViewer, save, toast } = useStore.getState();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<"original" | "text">("original");  // the real file, or the text read from it
+  const [onPage, setOnPage] = useState<boolean | null>(null);  // the cited passage found on the original page?
   const showOriginal = view === "original" && !!doc && previewable(doc);
 
   useEffect(() => {
@@ -95,13 +97,25 @@ export function Viewer() {
         </div>
       </div>
       <div className="vbody" ref={bodyRef}>
-        {showOriginal ? <OriginalFile doc={doc} page={Math.min(v.page ?? 1, pageCount)} zoom={v.zoom} /> : <Pages doc={doc} hl={hl} zoom={v.zoom} />}
+        {showOriginal
+          ? <OriginalFile doc={doc} page={Math.min(v.page ?? 1, pageCount)} zoom={v.zoom} onFound={setOnPage}
+              quote={hl && (!cur || cur.page === v.page) ? quotePassage(doc, hl) : undefined} />
+          : <Pages doc={doc} hl={hl} zoom={v.zoom} />}
       </div>
       <div className="vfoot">
-        {showOriginal ? <span>The original file as uploaded{hl ? `, at page ${v.page}. Use Text to see the cited passage highlighted.` : "."}</span>
+        {showOriginal ? (hl && onPage
+          ? <><i /><span>The cited passage is highlighted on the original page {v.page}. Text shows the exact words read from it.</span></>
+          : <span>The original file as uploaded{hl ? `, at page ${v.page}.${onPage === null ? " Finding the cited passage…" : " Use Text to see the cited passage highlighted."}` : "."}</span>)
           : hl ? <><i /><span>Highlighted text is the exact passage cited. Page {v.page}.</span></>
             : <span>The text read from the document{doc.fileType === "scan" ? " by OCR — check figures against the original" : ""}. Click a citation in an answer to jump to a passage.</span>}
       </div>
     </aside>
   );
+}
+
+/** The words to find on the original page: the quote, or the whole cited paragraph when there is none. */
+function quotePassage(doc: Doc, hl: { page: number; block: string; quote?: string }): string {
+  if (hl.quote) return hl.quote;
+  const b = doc.pages?.[hl.page - 1]?.find((x) => x.id === hl.block);
+  return b ? (Array.isArray(b.text) ? b.text.join(" ") : b.text) : "";
 }

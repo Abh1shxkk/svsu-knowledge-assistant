@@ -28,17 +28,29 @@ Future<Uint8List> _load(String key, Future<Uint8List> Function() fetch) {
 }
 
 class OriginalFile extends StatelessWidget {
-  const OriginalFile({super.key, required this.doc, this.page = 1});
+  const OriginalFile({super.key, required this.doc, this.page = 1, this.quote, this.onFound, this.hlKey});
   final Doc doc;
   final int page;
+  /// When given, the cited passage is highlighted on the page where it can be found there.
+  final String? quote;
+  final void Function(bool found)? onFound;
+  /// Attached to the first highlight box, so the viewer can scroll to it.
+  final GlobalKey? hlKey;
 
   @override
   Widget build(BuildContext context) {
     final fileKey = '${doc.file?['key']}';
-    if (doc.isPdf) {
-      return _Picture(k: '${doc.id}:$fileKey:$page', fetch: () => api.originalPage(doc.id, page));
+    final q = (quote ?? '').trim();
+    Future<List<List<double>>>? rects;
+    if (q.isNotEmpty && (doc.isPdf || doc.isImage)) {
+      rects = _highlights['${doc.id}:$page:$q'] ??= api.pageHighlight(doc.id, page, q).catchError((_) => <List<double>>[]);
     }
-    if (doc.isImage) return _Picture(k: '${doc.id}:$fileKey', fetch: () => api.originalFile(doc.id));
+    if (doc.isPdf) {
+      return _Picture(k: '${doc.id}:$fileKey:$page', fetch: () => api.originalPage(doc.id, page), rects: rects, onFound: onFound, hlKey: hlKey);
+    }
+    if (doc.isImage) {
+      return _Picture(k: '${doc.id}:$fileKey', fetch: () => api.originalFile(doc.id), rects: rects, onFound: onFound, hlKey: hlKey);
+    }
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(children: [
@@ -51,10 +63,20 @@ class OriginalFile extends StatelessWidget {
   }
 }
 
+final _highlights = <String, Future<List<List<double>>>>{};
+final _sizes = <String, Future<double>>{};
+
+/// Width / height of a picture, so highlight boxes can be laid over it in fractions of the page.
+Future<double> _aspect(String k, Uint8List bytes) => _sizes[k] ??= decodeImageFromList(bytes).then((im) => im.width / im.height);
+
 class _Picture extends StatelessWidget {
-  const _Picture({required this.k, required this.fetch});
+  const _Picture({required this.k, required this.fetch, this.rects, this.onFound, this.hlKey});
   final String k;
   final Future<Uint8List> Function() fetch;
+  final Future<List<List<double>>>? rects;
+  final void Function(bool found)? onFound;
+  final GlobalKey? hlKey;
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List>(
         future: _load(k, fetch),
@@ -62,9 +84,44 @@ class _Picture extends StatelessWidget {
           if (snap.hasError) return Padding(padding: const EdgeInsets.all(24), child: Text('${snap.error}', style: muted(context)));
           if (!snap.hasData) return const SizedBox(height: 320, child: Center(child: Spinner(size: 24)));
           if (snap.data!.isEmpty) return Padding(padding: const EdgeInsets.all(24), child: Text("Couldn't load this page.", style: muted(context)));
-          return Container(
-            decoration: BoxDecoration(border: Border.all(color: context.pal.line), color: Colors.white),
-            child: Image.memory(snap.data!, fit: BoxFit.fitWidth, width: double.infinity, gaplessPlayback: true),
+          final image = Image.memory(snap.data!, fit: BoxFit.fill, width: double.infinity, gaplessPlayback: true);
+          final frame = BoxDecoration(border: Border.all(color: context.pal.line), color: Colors.white);
+          if (rects == null) return Container(decoration: frame, child: image);
+          return FutureBuilder<(double, List<List<double>>)>(
+            future: Future.wait<Object>([_aspect(k, snap.data!), rects!]).then((r) => (r[0] as double, r[1] as List<List<double>>)),
+            builder: (context, hs) {
+              if (!hs.hasData) return Container(decoration: frame, child: image);
+              final (aspect, boxes) = hs.data!;
+              WidgetsBinding.instance.addPostFrameCallback((_) => onFound?.call(boxes.isNotEmpty));
+              return Container(
+                decoration: frame,
+                child: AspectRatio(
+                  aspectRatio: aspect,
+                  child: LayoutBuilder(
+                    builder: (context, c) => Stack(children: [
+                      Positioned.fill(child: image),
+                      for (final (i, b) in boxes.indexed)
+                        Positioned(
+                          key: i == 0 ? hlKey : null,
+                          left: b[0] * c.maxWidth,
+                          top: b[1] * c.maxHeight,
+                          width: (b[2] - b[0]) * c.maxWidth,
+                          height: (b[3] - b[1]) * c.maxHeight,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: const Color(0x66F5C518),
+                                border: Border.all(color: const Color(0xFFC08A12)),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ]),
+                  ),
+                ),
+              );
+            },
           );
         },
       );

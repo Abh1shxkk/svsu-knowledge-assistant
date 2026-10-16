@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, timedelta
 from pathlib import Path
 import pymupdf
-from fastapi import Body, Form, Depends, FastAPI, HTTPException, Response, UploadFile
+from fastapi import Body, Form, Depends, FastAPI, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import auth, evaluate, export, extract, jobs, llm, mfa, notices, policy, rag, store
+from . import auth, evaluate, export, extract, jobs, llm, locate, mfa, notices, policy, rag, store
 from .config import settings
 
 
@@ -440,6 +440,21 @@ def document_page_image(doc_id: str, n: int, user: dict = Depends(auth.current_u
         raise HTTPException(404, "No such page.")
     jpg = pdf[n - 1].get_pixmap(dpi=130).tobytes("jpeg", jpg_quality=80)  # light enough for phones
     return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.get("/documents/{doc_id}/file/page/{n}/highlight")
+def document_page_highlight(doc_id: str, n: int, q: str = Query(max_length=4000), user: dict = Depends(auth.current_user)):
+    """Where a cited passage sits on page n of the original, as boxes in fractions of the page, so the viewer
+    can highlight it on the scan itself. Plain `def`: the first call for a scanned page runs OCR."""
+    f = _visible_doc(user, doc_id).get("file")
+    stored = store.get_file(f["key"]) if f else None
+    if not stored:
+        raise HTTPException(404, "The original file isn't stored for this document.")
+    _, mime, data = stored
+    pages = len(pymupdf.open(stream=data, filetype="pdf")) if mime == "application/pdf" else 1 if mime.startswith("image/") else 0
+    if not 1 <= n <= pages:
+        raise HTTPException(404, "No such page.")
+    return {"rects": locate.locate(f["key"], mime, data, n, q)}
 
 
 @app.post("/documents/{doc_id}/deadlines")

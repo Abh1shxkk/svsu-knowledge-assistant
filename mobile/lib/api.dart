@@ -165,6 +165,11 @@ class Api {
   Future<Json> document(String id) async => await _json('GET', '/documents/${enc(id)}') as Json;
   Future<Uint8List> originalFile(String id) => _bytes('GET', '/documents/${enc(id)}/file');
   Future<Uint8List> originalPage(String id, int n) => _bytes('GET', '/documents/${enc(id)}/file/page/$n');
+  /// Where a quote sits on page n of the original: boxes [x0, y0, x1, y1] as fractions of the page.
+  Future<List<List<double>>> pageHighlight(String id, int n, String q) async {
+    final j = await _json('GET', '/documents/${enc(id)}/file/page/$n/highlight?q=${enc(q.length > 1500 ? q.substring(0, 1500) : q)}') as Json;
+    return [for (final r in j['rects'] as List) [for (final v in r as List) (v as num).toDouble()]];
+  }
   Future<List<String>> search(String q) async => List<String>.from(await _json('GET', '/search?q=${enc(q)}') as List);
   Future<List<List<String>>> checks(String id) async =>
       (await _json('GET', '/documents/${enc(id)}/checks') as List).map((e) => List<String>.from(e as List)).toList();
