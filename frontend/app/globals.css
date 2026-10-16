@@ -138,8 +138,10 @@ textarea.inp{resize:vertical}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-2);border-radius:20px;padding:4px 11px;font-size:12.5px;cursor:pointer;background:var(--surface);user-select:none}
-.chk input{position:absolute;opacity:0;pointer-events:none}
+.chk{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-2);border-radius:20px;padding:4px 11px;font-size:12.5px;cursor:pointer;background:var(--surface);user-select:none}
+/* The real input stays inside its chip: clicking a label focuses it, and the browser scrolls to it. Placed
+   anywhere else, that scroll moves a container that should never scroll and part of the screen goes blank. */
+.chk input{position:absolute;left:0;top:0;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
 .chk:has(input:checked){background:var(--brand-soft);border-color:var(--brand);color:var(--brand);font-weight:500}
 .chk:has(input:focus-visible){outline:2px solid var(--brand)}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--surface)}
